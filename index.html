@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>コンテンツ制作課 ～SNS投稿ワークフロー(3D)～</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  :root{ --gold:#d8b45a; --gold-dim:#7a6530; --navy:#12132b; --navy-deep:#0a0a1c; --panel:#1c1e3f; --ink:#eef0ff; }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; min-height:100%; width:100%; background:var(--navy-deep);
+    background-image: radial-gradient(ellipse at 50% 0%, #1a1c40 0%, var(--navy-deep) 70%);
+    color:var(--ink); font-family:'DotGothic16','MS Gothic','Hiragino Kaku Gothic ProN',monospace,sans-serif;
+    -webkit-font-smoothing:none;
+    overflow-x:hidden;
+  }
+  body{ padding:12px; }
+  .frame{ width:100%; max-width:800px; margin:0 auto; box-sizing:border-box; padding:14px; background:linear-gradient(180deg,#2a2c56,#14152f); border:3px solid var(--gold); border-radius:4px; box-shadow:0 0 0 1px #000, 0 10px 40px rgba(0,0,0,.6), inset 0 0 0 1px #4a4d80; }
+  .titlebar{ display:flex; justify-content:space-between; align-items:center; padding:6px 10px; margin-bottom:10px; background:var(--navy); border:2px solid var(--gold-dim); border-radius:2px; gap:8px; flex-wrap:wrap; }
+  .titlebar h1{ font-size:14px; margin:0; letter-spacing:2px; color:var(--gold); text-shadow:1px 1px 0 #000; }
+  .titlebar .sub{ font-size:10px; color:#9aa0d8; }
+  .stage-wrap{ position:relative; border:2px solid var(--gold-dim); background:#0d0e22; overflow:hidden; padding-top:66%; }
+  #scene3d{ position:absolute; top:0; left:0; width:100%; height:100%; display:block; touch-action:none; }
+  .hint{ position:absolute; right:8px; bottom:6px; font-size:9px; color:#9aa0d8; background:rgba(10,10,25,.6); padding:2px 6px; border-radius:2px; }
+  .vignette{ position:absolute; inset:0; pointer-events:none; box-shadow: inset 0 0 60px 16px rgba(0,0,0,.4); }
+  .steprow{ display:flex; gap:4px; margin-top:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:2px; }
+  .stepdot{ flex:0 0 auto; min-width:40px; text-align:center; padding:4px 3px; font-size:9px; background:var(--panel); border:2px solid var(--gold-dim); border-radius:2px; color:#7d82b0; }
+  .stepdot.active{ color:#fff2c8; border-color:var(--gold); background:#3a3560; }
+  .stepdot.done{ color:#9adfc0; border-color:#3f8f5c; }
+  .deptrow{ display:flex; gap:4px; margin-top:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:2px; }
+  .deptbtn{ flex:0 0 auto; min-width:44px; text-align:center; padding:5px 8px; font-size:10px; background:var(--panel); border:2px solid var(--gold-dim); border-radius:12px; color:#cfd3ff; cursor:pointer; user-select:none; }
+  .deptbtn:active{ background:#3a3560; border-color:var(--gold); color:#fff2c8; }
+  .deptbtn.overview{ color:#ffd76a; border-color:var(--gold); }
+  .voice-panel{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; align-items:center; }
+  .mic-btn, .gen-btn{
+    flex:0 0 auto; font-family:inherit; font-size:11px; color:#fff2c8;
+    background:var(--panel); border:2px solid var(--gold-dim); border-radius:14px;
+    padding:7px 12px; cursor:pointer;
+  }
+  .mic-btn.listening{ background:#8a2f3d; border-color:#ff8fb3; color:#fff; }
+  .gen-btn{ background:var(--gold-dim); border-color:var(--gold); }
+  .gen-btn:disabled, .mic-btn:disabled{ opacity:.5; cursor:default; }
+  #topicInput{
+    flex:1 1 160px; min-width:120px; font-family:inherit; font-size:11px; color:#f4f6ff;
+    background:#141d3a; border:2px solid var(--gold-dim); border-radius:14px; padding:7px 12px;
+  }
+  .gen-status{ flex:1 1 100%; font-size:10px; color:#9adfc0; min-height:14px; }
+  .gen-status.error{ color:#ff9fae; }
+  .stats{ display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; }
+  .chip{ flex:1 1 90px; background:var(--panel); border:2px solid var(--gold-dim); border-radius:2px; padding:6px 8px; font-size:11px; display:flex; flex-direction:column; gap:2px; }
+  .chip b{ color:var(--gold); font-size:9px; letter-spacing:1px; font-weight:normal; }
+  .chip span{ color:#fff; font-size:13px; }
+  .msgbox{ margin-top:6px; min-height:56px; background:linear-gradient(180deg,#1e2c52,#141d3a); border:3px solid #8fa8c9; box-shadow:0 0 0 1px #0a0e1e, inset 0 0 0 1px #050813; border-radius:3px; padding:9px 12px 9px 64px; font-size:12px; line-height:1.55; letter-spacing:.5px; position:relative; color:#f4f6ff; text-shadow:1px 1px 0 #000; }
+  .msgbox::before, .msgbox::after, .portrait::before, .portrait::after{ content:''; position:absolute; width:6px; height:6px; border-radius:50%; background:#8fa8c9; box-shadow:inset 0 0 0 1px #0a0e1e; }
+  .msgbox::before{ top:-3px; left:-3px; } .msgbox::after{ top:-3px; right:-3px; }
+  .portrait{ position:absolute; left:8px; top:8px; width:48px; height:48px; background:#141d3a; border:3px solid #8fa8c9; border-radius:4px; box-shadow:0 0 0 1px #0a0e1e; }
+  .portrait::before{ bottom:-3px; left:-3px; top:auto; } .portrait::after{ bottom:-3px; right:-3px; top:auto; }
+  .portrait canvas{ width:100%; height:100%; }
+  .cursor{ position:absolute; right:14px; bottom:10px; width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid #cfd8ee; animation:blink .9s steps(1) infinite; }
+  @keyframes blink{ 50%{ opacity:0; } }
+  .foot{ margin-top:6px; text-align:center; font-size:9px; color:#6b70a8; letter-spacing:1px; }
+  .post-preview{
+    margin-top:0; max-height:0; opacity:0; overflow:hidden;
+    transition:max-height .5s ease, opacity .5s ease, margin-top .5s ease;
+    border:3px solid var(--gold); border-radius:4px; background:var(--panel);
+  }
+  .post-preview.show{ margin-top:8px; max-height:420px; opacity:1; }
+  .pp-header{ font-size:10px; color:#fff2c8; background:var(--gold-dim); padding:5px 10px; letter-spacing:.5px; }
+  .pp-image{
+    position:relative; height:110px; background:linear-gradient(135deg,#2f8f73,#4ecca3 55%,#2f8f73);
+    display:flex; align-items:center; justify-content:center; text-align:center; padding:10px; overflow:hidden;
+  }
+  .pp-image-text{ color:#fff; font-size:16px; font-weight:bold; line-height:1.5; text-shadow:1px 2px 5px rgba(0,0,0,.45); }
+  .pp-caption{ padding:10px 12px; font-size:11px; line-height:1.7; color:#eef0ff; white-space:pre-wrap; }
+  @media (max-width:480px){
+    .pp-image{ height:90px; }
+    .pp-image-text{ font-size:13px; }
+    .pp-caption{ font-size:10px; }
+  }
+  @media (max-width: 480px){
+    body{ padding:8px; }
+    .frame{ padding:10px; }
+    .titlebar h1{ font-size:12px; }
+    .titlebar .sub{ font-size:8px; }
+    .msgbox{ font-size:11px; padding:8px 10px 8px 60px; min-height:56px; }
+    .portrait{ width:42px; height:42px; }
+    .stepdot{ min-width:34px; font-size:8px; }
+    .chip{ flex:1 1 45%; }
+  }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="titlebar">
+    <h1>AIコンテンツ制作課</h1>
+    <div class="sub">毎朝8:30 自動投稿ワークフロー（3Dローポリ）</div>
+  </div>
+
+  <div class="stage-wrap">
+    <canvas id="scene3d"></canvas>
+    <div class="vignette"></div>
+    <div class="hint">ドラッグ:視点回転 / ホイール:ズームイン・アウト</div>
+    <div id="fallbackMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:12px;color:#cfd3ff;background:#0d0e22;">3Dシーンを読み込み中…<br>（インターネット接続が必要です。ブラウザで開くと確実です）</div>
+  </div>
+
+  <div class="voice-panel">
+    <button id="micBtn" class="mic-btn" type="button">🎤 テーマを話す</button>
+    <input id="topicInput" type="text" placeholder="話すか、直接ここに入力（例：ヘッドスパキャンペーン）" />
+    <button id="genBtn" class="gen-btn" type="button">この内容で生成</button>
+    <div id="genStatus" class="gen-status"></div>
+  </div>
+
+  <div class="deptrow" id="deptRow"></div>
+
+  <div class="steprow" id="stepRow"></div>
+
+  <div class="stats">
+    <div class="chip"><b>本日の投稿数</b><span id="statPosts">0</span></div>
+    <div class="chip"><b>サイクル</b><span id="statCycle">1 周目</span></div>
+    <div class="chip"><b>現在の工程</b><span id="statPhase">①生成</span></div>
+  </div>
+
+  <div class="msgbox">
+    <div class="portrait"><canvas id="portrait" width="60" height="60"></canvas></div>
+    <div id="msgText">制作担当「投稿文・画像テキストを生成しています…」</div>
+    <div class="cursor"></div>
+  </div>
+
+  <div class="post-preview" id="postPreview">
+    <div class="pp-header">📮 投稿プレビュー ― Dulce ヘッドスパキャンペーン</div>
+    <div class="pp-image" id="ppImage">
+      <img id="ppImageImg" style="display:none;width:100%;height:100%;object-fit:cover;" alt="生成画像" />
+      <div class="pp-image-text" id="ppImageText">頭皮も、心も。<br>ヘッドスパキャンペーン</div>
+    </div>
+    <div class="pp-caption" id="ppCaption"></div>
+  </div>
+
+  <div class="foot">PROTOTYPE — ローポリ3Dモデルはオリジナル制作物です（特定作品のモデルデータではありません）</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js" crossorigin="anonymous"></script>
+<script>
+(function(){
+  try {
+  const wrap = document.getElementById('scene3d');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a1712);
+  scene.fog = new THREE.Fog(0x0d0e22, 26, 55);
+
+  const camera = new THREE.PerspectiveCamera(34, 760/440, 0.1, 200);
+  camera.position.set(3, 13, 21);
+  camera.lookAt(3, 0.5, 0.4);
+
+  const renderer = new THREE.WebGLRenderer({ canvas: wrap, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(760, 440, false); // safe default before layout is confirmed
+
+  function resizeRenderer(){
+    let w = wrap.clientWidth, h = wrap.clientHeight;
+    if(w<=0 || h<=0){
+      const rect = wrap.getBoundingClientRect();
+      w = rect.width; h = rect.height;
+    }
+    if(w<=0 || h<=0){ w = 760; h = 440; }
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resizeRenderer);
+  resizeRenderer();
+  setTimeout(resizeRenderer, 50);
+  setTimeout(resizeRenderer, 300);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableZoom = true;
+  controls.zoomSpeed = 1.0;
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.target.set(3, 0.5, 0.4);
+  controls.enablePan = false;
+  controls.minDistance = 6;
+  controls.maxDistance = 42;
+  controls.minPolarAngle = 0.2;
+  controls.maxPolarAngle = 1.25;
+  controls.update();
+
+  // ---------- lights ----------
+  scene.add(new THREE.HemisphereLight(0xbcd4ff, 0x3a2e1c, 0.95));
+  const key = new THREE.DirectionalLight(0xffdca0, 1.0);
+  key.position.set(4, 8, 6);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x8fbfff, 0.3);
+  rim.position.set(-6, 4, -4);
+  scene.add(rim);
+
+  // ---------- floor: wood planks (airship deck) ----------
+  function makePlankTexture(){
+    const cv = document.createElement('canvas'); cv.width=128; cv.height=128;
+    const c = cv.getContext('2d');
+    const tones = ['#8a6440','#7a5636','#6b4b33','#8a6440'];
+    for(let i=0;i<8;i++){
+      c.fillStyle = tones[i%tones.length];
+      c.fillRect(0, i*16, 128, 16);
+      c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth=1;
+      c.beginPath(); c.moveTo(0,i*16+15.5); c.lineTo(128,i*16+15.5); c.stroke();
+      // plank seams (offset per row)
+      const off = (i%2)*32;
+      for(let x=off; x<128; x+=48){
+        c.beginPath(); c.moveTo(x,i*16); c.lineTo(x,i*16+16); c.stroke();
+      }
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+    tex.repeat.set(9,5);
+    return tex;
+  }
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(32, 15),
+    new THREE.MeshStandardMaterial({ map: makePlankTexture(), roughness:0.95 })
+  );
+  floor.rotation.x = -Math.PI/2;
+  floor.position.set(0,0,-1);
+  scene.add(floor);
+
+  // ---------- back wall: riveted metal panels ----------
+  function makeRivetPanelTexture(){
+    const cv = document.createElement('canvas'); cv.width=256; cv.height=128;
+    const c = cv.getContext('2d');
+    c.fillStyle = '#4a4132'; c.fillRect(0,0,256,128);
+    c.strokeStyle = 'rgba(0,0,0,0.4)'; c.lineWidth=3;
+    for(let x=0;x<=256;x+=64){ c.beginPath(); c.moveTo(x,0); c.lineTo(x,128); c.stroke(); }
+    c.fillStyle = '#c9a24a';
+    for(let x=6; x<256; x+=64){
+      for(let y=6; y<128; y+=58){
+        c.beginPath(); c.arc(x,y,3.2,0,Math.PI*2); c.fill();
+        c.beginPath(); c.arc(x+58,y,3.2,0,Math.PI*2); c.fill();
+      }
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+    tex.repeat.set(6,2);
+    return tex;
+  }
+  const backWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(32, 7),
+    new THREE.MeshStandardMaterial({ map: makeRivetPanelTexture(), roughness:0.9, color:0xb8a888 })
+  );
+  backWall.position.set(0, 3.4, -4.9);
+  scene.add(backWall);
+
+  // ---------- windows showing open sky (like a floating airship deck) ----------
+  function makeSkyTexture(){
+    const cv = document.createElement('canvas'); cv.width=128; cv.height=96;
+    const c = cv.getContext('2d');
+    const g = c.createLinearGradient(0,0,0,96);
+    g.addColorStop(0,'#5a7fd0'); g.addColorStop(1,'#a9c8ee');
+    c.fillStyle = g; c.fillRect(0,0,128,96);
+    c.fillStyle = 'rgba(255,255,255,0.85)';
+    [[20,30,22,7],[70,20,26,8],[40,60,18,6],[90,55,20,7]].forEach(([x,y,w,h])=>{
+      c.beginPath(); c.ellipse(x,y,w,h,0,0,Math.PI*2); c.fill();
+    });
+    return new THREE.CanvasTexture(cv);
+  }
+  const skyTex = makeSkyTexture();
+  [-12.5, -6.8, -1, 4.8, 10.5].forEach(wx=>{
+    const win = new THREE.Mesh(new THREE.PlaneGeometry(2.3,1.6), new THREE.MeshBasicMaterial({ map:skyTex }));
+    win.position.set(wx, 4.0, -4.85);
+    scene.add(win);
+    const frame = new THREE.Mesh(new THREE.RingGeometry(1.35,1.5,4), new THREE.MeshStandardMaterial({color:0x2a2416, roughness:0.8}));
+    frame.position.set(wx,4.0,-4.83); frame.rotation.z = Math.PI/4;
+    scene.add(frame);
+  });
+
+  // ---------- support pipes / beams framing the deck ----------
+  function pipeAt(x, topY, botY, z, radius, color){
+    const h = topY - botY;
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,h,8), new THREE.MeshStandardMaterial({color, roughness:0.5, metalness:0.4}));
+    p.position.set(x, botY + h/2, z);
+    scene.add(p);
+    [botY, topY].forEach(y=>{
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(radius*1.25,0.04,6,10), new THREE.MeshStandardMaterial({color:0x2a2416}));
+      ring.position.set(x,y,z); ring.rotation.x = Math.PI/2;
+      scene.add(ring);
+    });
+  }
+  [-15.5, -9, -3, 3, 9, 15.5].forEach(x=>{ pipeAt(x, 6.6, 0, -4.6, 0.16, 0xa07a3e); });
+  // a couple of horizontal pipes running along the back wall
+  [2.2, 5.4].forEach(y=>{
+    const hp = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,32,8), new THREE.MeshStandardMaterial({color:0x8a6a3a, roughness:0.5, metalness:0.4}));
+    hp.rotation.z = Math.PI/2; hp.position.set(0,y,-4.55);
+    scene.add(hp);
+  });
+
+  // ---------- crates & barrels ----------
+  function makeCrate(x,z,scale){
+    const g = new THREE.Group();
+    const c = new THREE.Mesh(new THREE.BoxGeometry(0.8*scale,0.8*scale,0.8*scale), new THREE.MeshStandardMaterial({color:0x7a5636, flatShading:true, roughness:0.9}));
+    c.position.y = 0.4*scale; g.add(c);
+    const band = new THREE.Mesh(new THREE.BoxGeometry(0.84*scale,0.1*scale,0.84*scale), new THREE.MeshStandardMaterial({color:0x3e2a1c}));
+    band.position.y = 0.4*scale; g.add(band);
+    g.position.set(x,0,z);
+    scene.add(g);
+  }
+  function makeBarrel(x,z,scale){
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4*scale,0.42*scale,0.9*scale,10), new THREE.MeshStandardMaterial({color:0x6b4b33, flatShading:true, roughness:0.9}));
+    body.position.y = 0.45*scale; g.add(body);
+    [0.18,0.45,0.72].forEach(hy=>{
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.41*scale,0.035*scale,6,12), new THREE.MeshStandardMaterial({color:0x2a2416}));
+      ring.position.y = hy*scale; ring.rotation.x = Math.PI/2; g.add(ring);
+    });
+    g.position.set(x,0,z);
+    scene.add(g);
+  }
+  makeCrate(-14.2, 2.2, 1.1);
+  makeCrate(-13.6, 1.4, 0.8);
+  makeBarrel(14.2, 2.0, 1.1);
+  makeBarrel(14.9, 1.1, 0.9);
+
+  // ---------- helpers ----------
+  function box(w,h,d,color,opts){
+    opts = opts || {};
+    const m = new THREE.Mesh(
+      new THREE.BoxGeometry(w,h,d),
+      new THREE.MeshStandardMaterial({ color, flatShading:true, roughness:opts.roughness ?? 0.75, emissive: opts.emissive || 0x000000, emissiveIntensity: opts.emissiveIntensity || 0 })
+    );
+    return m;
+  }
+
+  // ---------- billboard label sprite ----------
+  function makeLabelSprite(text, color, opts){
+    opts = opts || {};
+    const fontSize = opts.fontSize || 26;
+    const pad = 18;
+    const measureCv = document.createElement('canvas');
+    const mctx = measureCv.getContext('2d');
+    mctx.font = "bold " + fontSize + "px 'DotGothic16', sans-serif";
+    const textW = Math.max(1, mctx.measureText(text).width);
+    const cw = Math.ceil(textW + pad*2);
+    const ch = Math.ceil(fontSize*1.7);
+    const cv = document.createElement('canvas'); cv.width=cw; cv.height=ch;
+    const c = cv.getContext('2d');
+    c.font = "bold " + fontSize + "px 'DotGothic16', sans-serif";
+    c.textAlign='center'; c.textBaseline='middle';
+    c.lineWidth = 6; c.strokeStyle = '#0a0e1e';
+    c.strokeText(text, cw/2, ch/2);
+    c.fillStyle = color;
+    c.fillText(text, cw/2, ch/2);
+    const tex = new THREE.CanvasTexture(cv);
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent:true });
+    const spr = new THREE.Sprite(mat);
+    const worldHeight = opts.worldHeight || 0.33;
+    const worldWidth = worldHeight * (cw/ch);
+    spr.scale.set(worldWidth, worldHeight, 1);
+    return spr;
+  }
+
+  // ---------- desk ----------
+  function buildDesk(color, label){
+    const g = new THREE.Group();
+    const top = box(1.7, 0.12, 0.9, color);
+    top.position.y = 0.85; g.add(top);
+    const legMat = 0x241c14;
+    [[-0.7,-0.35],[0.7,-0.35],[-0.7,0.35],[0.7,0.35]].forEach(([x,z])=>{
+      const leg = box(0.1,0.85,0.1, legMat);
+      leg.position.set(x, 0.42, z); g.add(leg);
+    });
+    const tag = makeLabelSprite(label, '#fff2c8');
+    tag.position.set(0, 1.5, 0);
+    g.add(tag);
+    return g;
+  }
+
+  // ---------- low-poly human ----------
+  function buildHuman(outfit, outfitDark, hair, skin){
+    const g = new THREE.Group();
+
+    const hip = new THREE.Group(); hip.position.y = 0.9; g.add(hip);
+    const torso = box(0.62, 0.62, 0.36, outfit); torso.position.y = 0.36; hip.add(torso);
+    const belt = box(0.64, 0.08, 0.38, outfitDark); belt.position.y = 0.03; hip.add(belt);
+
+    const neck = box(0.16,0.1,0.16, skin); neck.position.y = 0.7; hip.add(neck);
+    const head = box(0.42,0.4,0.4, skin); head.position.y = 0.98; hip.add(head);
+    const hairTop = box(0.46,0.18,0.44, hair); hairTop.position.y = 1.18; hip.add(hairTop);
+    const hairBack = box(0.44,0.32,0.14, hair); hairBack.position.set(0,1.02,-0.2); hip.add(hairBack);
+    const eyeL = box(0.06,0.05,0.02, 0x241c1c); eyeL.position.set(-0.1,0.98,0.2); hip.add(eyeL);
+    const eyeR = eyeL.clone(); eyeR.position.x = 0.1; hip.add(eyeR);
+
+    const shoulderY = 0.62;
+    function arm(sign){
+      const pivot = new THREE.Group(); pivot.position.set(sign*0.36, shoulderY, 0); hip.add(pivot);
+      const upper = box(0.16,0.36,0.16, outfit); upper.position.y=-0.18; pivot.add(upper);
+      const hand = box(0.15,0.15,0.15, skin); hand.position.y=-0.4; pivot.add(hand);
+      return pivot;
+    }
+    const armL = arm(-1), armR = arm(1);
+
+    function leg(sign){
+      const pivot = new THREE.Group(); pivot.position.set(sign*0.16, 0, 0); g.add(pivot);
+      const thigh = box(0.2,0.45,0.2, outfitDark); thigh.position.y=-0.225; pivot.add(thigh);
+      const shoe = box(0.22,0.14,0.26, 0x241c1c); shoe.position.y=-0.52; pivot.add(shoe);
+      return pivot;
+    }
+    const legL = leg(-1), legR = leg(1);
+
+    return { group:g, hip, armL, armR, legL, legR };
+  }
+
+  // ---------- low-poly robot clerk ----------
+  function buildRobot(color, accent){
+    const g = new THREE.Group();
+    const hip = new THREE.Group(); hip.position.y = 0.55; g.add(hip);
+    const body = box(0.6,0.5,0.34, color); body.position.y=0.25; hip.add(body);
+    const collar = box(0.62,0.08,0.36, 0x1c1f3a); collar.position.y=0.5; hip.add(collar);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24,8,6), new THREE.MeshStandardMaterial({color:accent, flatShading:true}));
+    head.position.y = 0.78; hip.add(head);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.09,8,6), new THREE.MeshStandardMaterial({color:0x2a2f55, emissive:0x223, emissiveIntensity:0.6}));
+    eye.position.set(0,0.78,0.2); hip.add(eye);
+    const antenna = box(0.03,0.3,0.03, accent); antenna.position.set(0,1.05,0); hip.add(antenna);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6), new THREE.MeshStandardMaterial({color:0xffd76a, emissive:0xffaa00, emissiveIntensity:0.6}));
+    tip.position.set(0,1.22,0); hip.add(tip);
+    function armStub(sign){
+      const pivot = new THREE.Group(); pivot.position.set(sign*0.34,0.4,0); hip.add(pivot);
+      const a = box(0.12,0.3,0.12, color); a.position.y=-0.15; pivot.add(a);
+      return pivot;
+    }
+    const armL = armStub(-1), armR = armStub(1);
+    return { group:g, hip, armL, armR, eye };
+  }
+
+  // ---------- data item (evolves per pipeline stage) ----------
+  function buildItem(){
+    const g = new THREE.Group();
+    const paper = box(0.32,0.02,0.42, 0xeef0ff); g.add(paper);
+    const frame = new THREE.Mesh(new THREE.RingGeometry(0.1,0.13,4), new THREE.MeshBasicMaterial({color:0x8fe0ff, side:THREE.DoubleSide}));
+    frame.rotation.x = -Math.PI/2; frame.position.y=0.02; frame.visible=false; g.add(frame);
+    const urlTag = box(0.14,0.05,0.14, 0x7dffb0); urlTag.position.set(0.15,0.05,-0.15); urlTag.visible=false; g.add(urlTag);
+    const img = box(0.34,0.03,0.44, 0x26264a); img.visible=false; g.add(img);
+    function setStage(stage){
+      paper.visible = stage==='text' || stage==='template';
+      frame.visible = stage==='template';
+      img.visible = stage==='image' || stage==='imageurl';
+      urlTag.visible = stage==='imageurl';
+    }
+    setStage('text');
+    g.position.y = 1.05;
+    return { group:g, setStage };
+  }
+  // ---------- stations ----------
+  // Main pipeline sits in two facing rows (back row / front row).
+  // Review (2 people) and Poster sit together at a separate end cluster,
+  // rotated 90° so they face sideways toward the main rows — closing the
+  // whole layout into a rectangle.
+  const ROW_GAP = 1.5;   // half-distance between the two main rows (z)
+  const COL_GAP = 3.0;   // spacing between columns in the main rows (x)
+  const END_X = 8.4;     // where the review/poster end cluster begins (x)
+  const END_GAP = 2.0;   // spacing between review/poster desks (z)
+
+  const STATIONS = [
+    // back row (z negative)
+    { id:'ideaA',   kind:'human', outfit:0x7fc9e8, outfitDark:0x4a8fb0, hair:0x3a2a20, skin:0xf2c9a0, label:'企画', deskLabel:'アイデア出し',   deskColor:0x5d7a9c, gx:-COL_GAP*1.5, gz:-ROW_GAP },
+    { id:'creator', kind:'human', outfit:0x4ecca3, outfitDark:0x2f8f73, hair:0x5b3a29, skin:0xf2c9a0, label:'制作', deskLabel:'ライティング机', deskColor:0x7a5636, gx:-COL_GAP*0.5, gz:-ROW_GAP },
+    { id:'tmplbot', kind:'robot', color:0x8fb0e0, accent:0xeaf6ff,                                   label:'合成', deskLabel:'テンプレ合成機', deskColor:0x5d6a9c, gx: COL_GAP*0.5, gz:-ROW_GAP },
+    { id:'shotbot', kind:'robot', color:0xe08fbb, accent:0xfff0f6,                                   label:'撮影', deskLabel:'スクショカメラ', deskColor:0x9c5d80, gx: COL_GAP*1.5, gz:-ROW_GAP },
+    // front row (z positive) — rotated 180° to face back toward the back row (facing each other across the aisle)
+    { id:'ideaB',   kind:'human', outfit:0xf0c96a, outfitDark:0xb08f3a, hair:0x2a2a2a, skin:0xf2c9a0, label:'企画', deskLabel:'アイデア出し',   deskColor:0x9c8a5d, gx:-COL_GAP*1.5, gz: ROW_GAP, rot:Math.PI },
+    { id:'designer',kind:'human', outfit:0xe0a05a, outfitDark:0xa8703a, hair:0x3a2a1a, skin:0xf2c9a0, label:'相談', deskLabel:'デザイン相談役', deskColor:0x9c7a5d, gx: COL_GAP*0.5, gz: ROW_GAP, rot:Math.PI },
+    { id:'upbot',   kind:'robot', color:0x8fe0b0, accent:0xeafff2,                                   label:'UP',   deskLabel:'アップロード機', deskColor:0x5d9c78, gx: COL_GAP*1.5, gz: ROW_GAP, rot:Math.PI },
+    // end cluster: review pair (2 side-by-side) + poster, all facing sideways (-x) toward the main block
+    { id:'reviewA', kind:'human', outfit:0xc98fd0, outfitDark:0x8f5a9c, hair:0x4a3020, skin:0xf2c9a0, label:'校正', deskLabel:'レビューデスク',   deskColor:0x8a5d9c, gx: END_X, gz:-END_GAP/2, rot:Math.PI/2 },
+    { id:'reviewB', kind:'human', outfit:0x8fd0a8, outfitDark:0x5a9c78, hair:0x2a2020, skin:0xf2c9a0, label:'校正', deskLabel:'レビューデスク',   deskColor:0x5d9c78, gx: END_X, gz: END_GAP/2, rot:Math.PI/2 },
+    { id:'poster',  kind:'human', outfit:0xe9557a, outfitDark:0xa83a58, hair:0x6c3352, skin:0xf2c9a0, label:'投稿', deskLabel:'投稿ステーション', deskColor:0x8a4a5c, gx: END_X+2.6, gz:0, rot:Math.PI/2 },
+  ];
+
+  const IDX = {};
+  STATIONS.forEach((s,i)=>{ IDX[s.id] = i; });
+
+  function rotateOffset(dx, dz, theta){
+    return { x: dx*Math.cos(theta) + dz*Math.sin(theta), z: -dx*Math.sin(theta) + dz*Math.cos(theta) };
+  }
+
+  STATIONS.forEach((s)=>{
+    s.homeX = s.gx; s.homeZ = s.gz; s.rot = s.rot || 0;
+    s.deskOffset = rotateOffset(0, 0.85, s.rot);
+    const desk = buildDesk(s.deskColor, s.deskLabel);
+    desk.position.set(s.homeX + s.deskOffset.x, 0, s.homeZ + s.deskOffset.z);
+    desk.rotation.y = s.rot;
+    scene.add(desk);
+
+    const built = s.kind==='human'
+      ? buildHuman(s.outfit, s.outfitDark, s.hair, s.skin)
+      : buildRobot(s.color, s.accent);
+    built.group.position.set(s.homeX, 0, s.homeZ);
+    built.group.rotation.y = s.rot;
+    scene.add(built.group);
+    s.model = built;
+
+    const nameTag = makeLabelSprite(s.label, '#e4e8ff');
+    nameTag.position.set(0, 1.85, 0);
+    built.group.add(nameTag);
+
+    const bubble = makeLabelSprite('…', '#ffffff');
+    bubble.scale.set(0.55, 0.24, 1);
+    bubble.position.set(0, 2.15, 0);
+    bubble.visible = false;
+    built.group.add(bubble);
+    s.chatBubble = bubble;
+
+    s.atb = 0; s.walkPhase = 0; s.idlePhase = Math.random()*10;
+  });
+
+  // ---------- per-department zoom ----------
+  const HOME_CAM_POS = new THREE.Vector3(3, 13, 21);
+  const HOME_CAM_TARGET = new THREE.Vector3(3, 0.5, 0.4);
+  let camTween = null;
+
+  function focusStation(id){
+    let toTarget, toPos;
+    if(id){
+      const s = STATIONS.find(x=>x.id===id);
+      const fwd = { x: Math.sin(s.rot), z: Math.cos(s.rot) };
+      toTarget = new THREE.Vector3(s.homeX, 1.0, s.homeZ);
+      toPos = new THREE.Vector3(s.homeX + fwd.x*6.2, 4.0, s.homeZ + fwd.z*6.2);
+    } else {
+      toTarget = HOME_CAM_TARGET.clone();
+      toPos = HOME_CAM_POS.clone();
+    }
+    camTween = {
+      fromPos: camera.position.clone(), toPos,
+      fromTarget: controls.target.clone(), toTarget,
+      t: 0, dur: 700
+    };
+  }
+
+  const deptRowEl = document.getElementById('deptRow');
+  const overviewBtn = document.createElement('div');
+  overviewBtn.className = 'deptbtn overview';
+  overviewBtn.textContent = '全体';
+  overviewBtn.addEventListener('click', ()=>focusStation(null));
+  deptRowEl.appendChild(overviewBtn);
+  STATIONS.forEach(s=>{
+    const btn = document.createElement('div');
+    btn.className = 'deptbtn';
+    btn.textContent = s.label;
+    btn.addEventListener('click', ()=>focusStation(s.id));
+    deptRowEl.appendChild(btn);
+  });
+
+  // a single shared "document" travels through the pipeline (no more duplicate copies)
+  const sharedItem = buildItem();
+  sharedItem.group.visible = false;
+  scene.add(sharedItem.group);
+  let itemStage = 'text';
+  let itemVisible = false;
+  let itemOwner = IDX.creator; // station index currently holding the item when not in transit
+
+  // ---------- final post preview (shown once the pipeline completes a cycle) ----------
+  let CAMPAIGN_CAPTION =
+'髪だけじゃなく、頭皮からきれいを整える時間を。\n\n' +
+'Dulceのヘッドスパは、凝り固まった頭皮をほぐしながら血行を促進し、髪本来のツヤとハリを引き出します🌿\n\n' +
+'・肩や首のコリが気になる方\n' +
+'・最近髪にツヤがないと感じる方\n' +
+'・とにかくゆっくりリラックスしたい方\n\n' +
+'そんな方にこそ試してほしいメニューです。\n\n' +
+'ご予約はプロフィールのリンクから🔗\n\n' +
+'#ヘッドスパ #札幌美容室 #Dulce #頭皮ケア #リラックスタイム';
+  document.getElementById('ppCaption').textContent = CAMPAIGN_CAPTION;
+  function showPostPreview(show){
+    document.getElementById('postPreview').classList.toggle('show', show);
+  }
+
+  // ---------- voice input + GAS-generated caption ----------
+  // GASでWeb Appをデプロイしたら、そのURLをここに入れてください。
+  const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyadu6CgbhT-0XNC8GmnRTA5YSNnmCsGHzK8IIaFB9ZWyNyE2Vh0VeNRoQl6BZhrTtvhw/exec';
+
+  const micBtn = document.getElementById('micBtn');
+  const topicInput = document.getElementById('topicInput');
+  const genBtn = document.getElementById('genBtn');
+  const genStatus = document.getElementById('genStatus');
+
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(SpeechRec){
+    const recognition = new SpeechRec();
+    recognition.lang = 'ja-JP';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    let listening = false;
+    micBtn.addEventListener('click', ()=>{
+      if(listening) return;
+      listening = true;
+      micBtn.classList.add('listening');
+      micBtn.textContent = '🎤 聞き取り中…';
+      try{ recognition.start(); }catch(e){}
+    });
+    recognition.onresult = (e)=>{
+      topicInput.value = e.results[0][0].transcript;
+    };
+    function stopListening(){
+      listening = false;
+      micBtn.classList.remove('listening');
+      micBtn.textContent = '🎤 テーマを話す';
+    }
+    recognition.onend = stopListening;
+    recognition.onerror = ()=>{ stopListening(); genStatus.textContent='音声認識でエラーが発生しました。直接入力もできます。'; genStatus.className='gen-status error'; };
+  } else {
+    micBtn.disabled = true;
+    micBtn.textContent = '🎤 音声入力非対応';
+  }
+
+  genBtn.addEventListener('click', async ()=>{
+    const topic = topicInput.value.trim();
+    if(!topic){ genStatus.textContent='テーマを話すか入力してください。'; genStatus.className='gen-status error'; return; }
+    if(!GAS_WEBAPP_URL){
+      genStatus.textContent='GAS_WEBAPP_URL が未設定です（コード内に貼り付けてください）。';
+      genStatus.className='gen-status error';
+      return;
+    }
+    genBtn.disabled = true; micBtn.disabled = true;
+    genStatus.textContent='生成中…（文章と画像をAIが作っています。10秒ほどかかることがあります）';
+    genStatus.className='gen-status';
+    try{
+      const res = await fetch(GAS_WEBAPP_URL, {
+        method:'POST',
+        headers:{ 'Content-Type':'text/plain;charset=utf-8' }, // GASのCORSプリフライト回避のためtext/plainで送る
+        body: JSON.stringify({ topic })
+      });
+      const data = await res.json();
+      if(!data.ok) throw new Error(data.error || '生成に失敗しました');
+      CAMPAIGN_CAPTION = data.caption;
+      document.getElementById('ppCaption').textContent = CAMPAIGN_CAPTION;
+      document.querySelector('.pp-header').textContent = '📮 投稿プレビュー ― ' + topic;
+
+      const ppImg = document.getElementById('ppImageImg');
+      const ppText = document.getElementById('ppImageText');
+      if(data.image){
+        ppImg.src = data.image;
+        ppImg.style.display = 'block';
+        ppText.style.display = 'none';
+      } else {
+        ppImg.style.display = 'none';
+        ppText.style.display = 'block';
+        ppText.textContent = topic;
+      }
+
+      genStatus.textContent = data.imageError
+        ? '文章は生成できましたが、画像生成でエラーが出ました（' + data.imageError + '）。①から流れます…'
+        : '生成できました。①から流れます…';
+      enterSeg(0);
+    } catch(err){
+      genStatus.textContent = 'エラー: ' + err.message;
+      genStatus.className='gen-status error';
+    } finally {
+      genBtn.disabled = false; micBtn.disabled = !SpeechRec;
+    }
+  });
+
+  // ---------- portrait (2D, small) ----------
+  const pctx = document.getElementById('portrait').getContext('2d');
+  function hex(n){ return '#' + n.toString(16).padStart(6,'0'); }
+  function drawPortrait(kind){
+    pctx.clearRect(0,0,60,60);
+    pctx.fillStyle = '#141d3a'; pctx.fillRect(0,0,60,60);
+    if(kind==='system'){
+      pctx.strokeStyle = '#8fe0ff'; pctx.lineWidth = 3;
+      pctx.strokeRect(16,16,28,22);
+      pctx.beginPath();
+      for(let i=0;i<8;i++){ const a=(Math.PI*2/8)*i; pctx.moveTo(30+Math.cos(a)*16,46+Math.sin(a)*16); pctx.lineTo(30+Math.cos(a)*20,46+Math.sin(a)*20); }
+      pctx.stroke();
+      return;
+    }
+    const s = STATIONS.find(st=>st.id===kind);
+    pctx.fillStyle = hex(s.skin); pctx.beginPath(); pctx.arc(30,34,15,0,Math.PI*2); pctx.fill();
+    pctx.fillStyle = hex(s.hair); pctx.fillRect(14,12,32,14);
+    pctx.beginPath(); pctx.arc(30,20,16,Math.PI,Math.PI*2); pctx.fill();
+    pctx.fillStyle = '#241c1c';
+    pctx.fillRect(23,32,3,4); pctx.fillRect(35,32,3,4);
+    pctx.fillStyle = hex(s.outfit); pctx.fillRect(10,48,40,14);
+  }
+
+  // ---------- steps / dialogue ----------
+  // The step row (①〜⑦) tracks only the real automation. The idea/review/design
+  // desks are flavor added on top — they don't correspond to an actual step.
+  const STEP_INFO = [
+    { chip:'①生成',     speaker:'creator', name:'制作担当',       text:'投稿文・画像テキストを生成しています…' },
+    { chip:'②合成',     speaker:'system',  name:'自動化スクリプト', text:'image-template.html にテキストを埋め込んでいます…' },
+    { chip:'③撮影',     speaker:'system',  name:'自動化スクリプト', text:'ヘッドレスEdgeでスクリーンショットを撮影中…(post.png)' },
+    { chip:'④UP',       speaker:'system',  name:'自動化スクリプト', text:'ImgBBに画像をアップロード中…画像URLを取得します' },
+    { chip:'⑤IG予約',   speaker:'poster',  name:'投稿担当',       text:'BufferからInstagramへ投稿を予約しています…' },
+    { chip:'⑥Threads', speaker:'poster',  name:'投稿担当',       text:'BufferからThreadsへ投稿を予約しています…' },
+    { chip:'⑦記録',     speaker:'poster',  name:'投稿担当',       text:'draft.txtに記録し、ntfyで完了通知を送りました！' },
+  ];
+  const FLAVOR_INFO = {
+    brainstorm:  { speaker:'ideaA',   name:'企画担当',  text:'投稿のネタを話し合っています…（社内向けの雰囲気づくりです）' },
+    evalDiscuss: { speaker:'reviewA', name:'校正担当',  text:'原稿の言い回しをふたりで確認しています…' },
+  };
+  const stepRowEl = document.getElementById('stepRow');
+  STEP_INFO.forEach((s,i)=>{
+    const d = document.createElement('div'); d.className='stepdot'; d.id='sd'+i;
+    d.textContent = s.chip.slice(0,1); stepRowEl.appendChild(d);
+  });
+  function markSteps(i){ STEP_INFO.forEach((s,idx)=>{ const el=document.getElementById('sd'+idx); el.className='stepdot'+(idx===i?' active':idx<i?' done':''); }); }
+  function setMsg(idx){
+    const s = STEP_INFO[idx];
+    document.getElementById('msgText').textContent = s.name + '「' + s.text + '」';
+    document.getElementById('statPhase').textContent = s.chip;
+    drawPortrait(s.speaker);
+    markSteps(idx);
+  }
+  function setFlavorMsg(key){
+    const s = FLAVOR_INFO[key];
+    document.getElementById('msgText').textContent = s.name + '「' + s.text + '」';
+    document.getElementById('statPhase').textContent = key==='brainstorm' ? '企画中' : '内部レビュー';
+    drawPortrait(s.speaker);
+  }
+
+  // ---------- sequence ----------
+  // Real automation steps map onto stations: creator=①, tmplbot=②, shotbot=③, upbot=④, poster=⑤⑥⑦.
+  // brainstorm / evalDiscuss / the designer↔tmplbot chatter are added flavor, not real steps.
+  const SEQ = [
+    { key:'brainstorm',  dur:2600 },
+    { key:'gen',         dur:2200, station:IDX.creator },
+    { key:'travelA',     dur:5000, from:IDX.creator, to:IDX.reviewA },
+    { key:'evalDiscuss', dur:2600, station:IDX.reviewA },
+    { key:'travelB',     dur:5000, from:IDX.reviewA, to:IDX.tmplbot },
+    { key:'tmplProc',    dur:1300, station:IDX.tmplbot },
+    { key:'travelC',     dur:5000, from:IDX.tmplbot, to:IDX.shotbot },
+    { key:'shotProc',    dur:1300, station:IDX.shotbot },
+    { key:'travelD',     dur:5000, from:IDX.shotbot, to:IDX.upbot },
+    { key:'upProc',      dur:1300, station:IDX.upbot },
+    { key:'travelE',     dur:5000, from:IDX.upbot, to:IDX.poster },
+    { key:'ig',          dur:1300, station:IDX.poster },
+    { key:'threads',     dur:1300, station:IDX.poster },
+    { key:'log',         dur:1200, station:IDX.poster },
+    { key:'donePause',   dur:4000 },
+    { key:'resetPause',  dur:200 },
+  ];
+  let seqIdx = 0, segT = 0, posts = 0, cycle = 1;
+  let travel = null;
+
+  // ---------- optional: sync with the real automation via ntfy ----------
+  // Claude Code側の①〜⑦の各ステップで ntfy にJSONを送るだけで、このデモが実際の進行と同期します。
+  //   例: curl -d '{"step":3}' ntfy.sh/YOUR_TOPIC_NAME
+  // トピック名をここに入れると有効になります（空のままなら今まで通り自動デモループします）。
+  const LIVE_TOPIC = '';
+  let liveMode = false, liveWaiting = false;
+  const STEP_TO_SEGKEY = ['gen','tmplProc','shotProc','upProc','ig','threads','log'];
+
+  function handleLiveStep(step){
+    const idx = step - 1;
+    if(idx<0 || idx>=STEP_TO_SEGKEY.length) return;
+    const gi = SEQ.findIndex(s=>s.key===STEP_TO_SEGKEY[idx]);
+    if(gi>=0) enterSeg(gi);
+    liveWaiting = false;
+  }
+
+  if(LIVE_TOPIC){
+    liveMode = true;
+    document.querySelector('.foot').textContent = 'LIVE — ' + LIVE_TOPIC + ' の通知に同期しています';
+    try{
+      const es = new EventSource('https://ntfy.sh/' + LIVE_TOPIC + '/sse');
+      es.onmessage = (ev)=>{
+        try{
+          const data = JSON.parse(ev.data);
+          const msg = data.message ? JSON.parse(data.message) : data;
+          if(msg && msg.step) handleLiveStep(msg.step);
+        }catch(e){ /* ignore malformed messages */ }
+      };
+    }catch(e){ liveMode = false; }
+  }
+
+  function enterSeg(i){
+    seqIdx = i; segT = 0;
+    const seg = SEQ[i];
+    travel = null; // always clear on entry — nothing "in transit" unless this segment says so
+    if(seg.key==='brainstorm'){ setFlavorMsg('brainstorm'); itemVisible=false; showPostPreview(false); }
+    if(seg.key==='gen'){ setMsg(0); STATIONS[IDX.creator].atb=0; itemVisible=false; }
+    if(seg.key==='travelA'){ travel={from:IDX.creator,to:IDX.reviewA}; itemStage='text'; itemVisible=true; itemOwner=IDX.reviewA; }
+    if(seg.key==='evalDiscuss'){ setFlavorMsg('evalDiscuss'); itemOwner=IDX.reviewA; }
+    if(seg.key==='travelB'){ travel={from:IDX.reviewA,to:IDX.tmplbot}; itemStage='text'; itemOwner=IDX.tmplbot; }
+    if(seg.key==='tmplProc'){ setMsg(1); STATIONS[IDX.tmplbot].atb=0; itemStage='template'; itemOwner=IDX.tmplbot; }
+    if(seg.key==='travelC'){ travel={from:IDX.tmplbot,to:IDX.shotbot}; itemStage='template'; itemOwner=IDX.shotbot; }
+    if(seg.key==='shotProc'){ setMsg(2); STATIONS[IDX.shotbot].atb=0; itemStage='image'; itemOwner=IDX.shotbot; }
+    if(seg.key==='travelD'){ travel={from:IDX.shotbot,to:IDX.upbot}; itemStage='image'; itemOwner=IDX.upbot; }
+    if(seg.key==='upProc'){ setMsg(3); STATIONS[IDX.upbot].atb=0; itemStage='imageurl'; itemOwner=IDX.upbot; }
+    if(seg.key==='travelE'){ travel={from:IDX.upbot,to:IDX.poster}; itemStage='imageurl'; itemOwner=IDX.poster; }
+    if(seg.key==='ig'){ setMsg(4); STATIONS[IDX.poster].atb=0; itemVisible=false; }
+    if(seg.key==='threads'){ setMsg(5); STATIONS[IDX.poster].atb=0; }
+    if(seg.key==='log'){ setMsg(6); STATIONS[IDX.poster].atb=0; }
+    if(seg.key==='donePause'){ posts+=1; document.getElementById('statPosts').textContent = posts; showPostPreview(true); }
+    if(seg.key==='resetPause'){ cycle+=1; document.getElementById('statCycle').textContent = cycle+' 周目'; }
+  }
+  enterSeg(0);
+
+  function lerp(a,b,t){ return a+(b-a)*t; }
+
+  function updateStory(dt){
+    segT += dt;
+    const seg = SEQ[seqIdx];
+    const t = Math.min(1, segT/seg.dur);
+    if(['gen','tmplProc','shotProc','upProc','ig','threads','log'].includes(seg.key)){
+      STATIONS[seg.station].atb = t;
+    }
+    if(seg.key && seg.key.indexOf('travel')===0) travel.progress = t;
+    if(segT >= seg.dur){
+      const holdForReal = liveMode && (STEP_TO_SEGKEY.includes(seg.key) || seg.key==='resetPause');
+      if(holdForReal){ liveWaiting = true; segT = seg.dur; }
+      else { enterSeg((seqIdx+1) % SEQ.length); }
+    }
+  }
+
+  // ---------- per-frame character animation ----------
+  const clock = new THREE.Clock();
+  let time = 0;
+
+  function resetPose(s){
+    s.model.group.rotation.y = s.rot;
+    s.model.armL.rotation.x = 0; s.model.armR.rotation.x = 0;
+    if(s.kind==='human'){ s.model.legL.rotation.x = 0; s.model.legR.rotation.x = 0; }
+  }
+  function animateIdle(s, dt){
+    s.idlePhase += dt;
+    const bob = Math.sin(s.idlePhase*2) * 0.01;
+    s.model.hip.position.y = (s.kind==='human' ? 0.9 : 0.55) + bob;
+    resetPose(s);
+    s.model.hip.position.y = (s.kind==='human' ? 0.9 : 0.55) + bob;
+  }
+  function animateWork(s, dt){
+    s.idlePhase += dt*3;
+    const tap = Math.sin(s.idlePhase*4) * 0.35;
+    s.model.group.rotation.y = s.rot;
+    s.model.armR.rotation.x = -0.3 + tap*0.4;
+    s.model.armL.rotation.x = -0.1;
+    if(s.kind==='human'){ s.model.legL.rotation.x = 0; s.model.legR.rotation.x = 0; }
+    s.model.hip.position.y = (s.kind==='human' ? 0.9 : 0.55) + Math.sin(s.idlePhase*4)*0.005;
+    if(s.kind==='robot' && s.model.eye) s.model.eye.material.emissiveIntensity = 0.4 + Math.abs(Math.sin(s.idlePhase*5))*0.8;
+  }
+  // two people (or a person + robot) turn toward each other and gesture, as if discussing
+  function animateChat(sA, sB, dt){
+    [sA,sB].forEach((s,idx)=>{
+      s.idlePhase += dt*2.2;
+      s.model.group.rotation.y = s.rot + (s===sA ? -0.3 : 0.3);
+      const g = Math.sin(s.idlePhase*3 + idx*1.5) * 0.35;
+      s.model.armR.rotation.x = -0.35 + g*0.3;
+      s.model.armL.rotation.x = -0.1;
+      if(s.kind==='human'){ s.model.legL.rotation.x=0; s.model.legR.rotation.x=0; }
+      s.model.hip.position.y = (s.kind==='human' ? 0.9 : 0.55) + Math.sin(s.idlePhase*3)*0.008;
+    });
+  }
+  function animateWalk(s, dt, facing){
+    s.walkPhase += dt*6;
+    const swing = Math.sin(s.walkPhase) * 0.5;
+    if(s.kind==='human'){
+      s.model.legL.rotation.x = swing; s.model.legR.rotation.x = -swing;
+      s.model.armL.rotation.x = -swing*0.7; s.model.armR.rotation.x = swing*0.7;
+      s.model.hip.position.y = 0.9 + Math.abs(Math.cos(s.walkPhase))*0.03;
+    } else {
+      s.model.hip.position.y = 0.55 + Math.sin(s.walkPhase*1.4)*0.06; // hover bob
+      s.model.armL.rotation.x = Math.sin(s.walkPhase)*0.2;
+      s.model.armR.rotation.x = -Math.sin(s.walkPhase)*0.2;
+    }
+    s.model.group.rotation.y = facing;
+  }
+
+  function render(dt){
+    const seg = SEQ[seqIdx];
+    const activeIdx = ['gen','tmplProc','shotProc','upProc','ig','threads','log'].includes(seg.key) ? seg.station : -1;
+    const travelIdx = travel ? travel.from : -1;
+    const chatPair = seg.key==='brainstorm' ? [IDX.ideaA,IDX.ideaB] : seg.key==='evalDiscuss' ? [IDX.reviewA,IDX.reviewB] : null;
+    const designerChat = seg.key==='tmplProc' && Math.sin(time*1.3) > 0.25;
+
+    STATIONS.forEach(s=>{ s.chatBubble.visible = false; });
+
+    STATIONS.forEach((s,i)=>{
+      if(i===travelIdx) return;
+      s.model.group.position.set(s.homeX, 0, s.homeZ);
+      if(chatPair && chatPair.includes(i)){
+        // handled in pair-wise pass below
+      } else if(i===IDX.tmplbot && designerChat){
+        // tmplbot glances toward the designer while chatting
+      } else if(i===activeIdx){
+        animateWork(s, dt);
+      } else {
+        animateIdle(s, dt);
+      }
+    });
+
+    if(chatPair){
+      animateChat(STATIONS[chatPair[0]], STATIONS[chatPair[1]], dt);
+      STATIONS[chatPair[0]].chatBubble.visible = true;
+      STATIONS[chatPair[1]].chatBubble.visible = true;
+    }
+    if(designerChat){
+      animateChat(STATIONS[IDX.tmplbot], STATIONS[IDX.designer], dt);
+      STATIONS[IDX.tmplbot].chatBubble.visible = true;
+      STATIONS[IDX.designer].chatBubble.visible = true;
+    }
+
+    // traveler (walking / hovering between two desks, carrying the item)
+    if(travel){
+      const a = STATIONS[travel.from], b = STATIONS[travel.to];
+      const progress = travel.progress || 0;
+      const forward = progress <= 0.5;
+      const phaseT = forward ? (progress/0.5) : ((progress-0.5)/0.5);
+      const sx = forward ? a.homeX : b.homeX, sz = forward ? a.homeZ : b.homeZ;
+      const ex = forward ? b.homeX : a.homeX, ez = forward ? b.homeZ : a.homeZ;
+      const x = lerp(sx, ex, phaseT), z = lerp(sz, ez, phaseT);
+      a.model.group.position.set(x, 0, z);
+      const dx = ex - sx, dz = ez - sz;
+      const facing = -Math.atan2(dx, dz);
+      animateWalk(a, dt, facing);
+
+      if(forward){
+        const dlen = Math.max(0.001, Math.hypot(dx,dz));
+        sharedItem.group.visible = itemVisible;
+        sharedItem.group.position.set(x + (dx/dlen)*0.35, 1.05, z + (dz/dlen)*0.35);
+      } else {
+        sharedItem.group.visible = itemVisible;
+        sharedItem.group.position.set(b.homeX + b.deskOffset.x*0.65, 1.05, b.homeZ + b.deskOffset.z*0.65);
+      }
+    } else if(itemVisible){
+      const owner = STATIONS[itemOwner];
+      sharedItem.group.visible = true;
+      sharedItem.group.position.set(owner.homeX + owner.deskOffset.x*0.65, 1.05, owner.homeZ + owner.deskOffset.z*0.65);
+    } else {
+      sharedItem.group.visible = false;
+    }
+    sharedItem.setStage(itemStage);
+  }
+
+  const fb = document.getElementById('fallbackMsg');
+  if(fb) fb.style.display = 'none';
+
+  function loop(){
+    try{
+      const dt = Math.min(0.05, clock.getDelta());
+      time += dt;
+      updateStory(dt*1000);
+      render(dt);
+      if(camTween){
+        camTween.t += dt*1000;
+        const p = Math.min(1, camTween.t/camTween.dur);
+        const e = p<0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;
+        camera.position.lerpVectors(camTween.fromPos, camTween.toPos, e);
+        controls.target.lerpVectors(camTween.fromTarget, camTween.toTarget, e);
+        if(p>=1) camTween = null;
+      }
+      controls.update();
+      renderer.render(scene, camera);
+    } catch(frameErr){
+      console.error('frame error', frameErr);
+      const fb = document.getElementById('fallbackMsg');
+      if(fb){
+        fb.style.display = 'flex';
+        fb.innerHTML = '表示中にエラーが発生しました。ページを再読み込みしてください。<br><span style="opacity:.6;font-size:10px;">' + (frameErr && frameErr.message ? frameErr.message : String(frameErr)) + '</span>';
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  } catch(err){
+    const fb = document.getElementById('fallbackMsg');
+    if(fb){
+      fb.style.display = 'flex';
+      fb.innerHTML = '3Dの読み込みに失敗しました。<br>ブラウザで開く、または通信環境の良い場所でお試しください。<br><span style="opacity:.6;font-size:10px;">' + (err && err.message ? err.message : String(err)) + '</span>';
+    }
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>
