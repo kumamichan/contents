@@ -47,6 +47,13 @@
   }
   .gen-status{ flex:1 1 100%; font-size:10px; color:#9adfc0; min-height:14px; }
   .gen-status.error{ color:#ff9fae; }
+  .mode-toggle{ flex:1 1 100%; display:flex; gap:6px; }
+  .mode-btn{
+    flex:1; font-family:inherit; font-size:10px; color:#9aa0d8;
+    background:#141d3a; border:2px solid var(--gold-dim); border-radius:14px;
+    padding:6px 8px; cursor:pointer;
+  }
+  .mode-btn.active{ background:var(--gold-dim); border-color:var(--gold); color:#fff2c8; }
   .stats{ display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; }
   .chip{ flex:1 1 90px; background:var(--panel); border:2px solid var(--gold-dim); border-radius:2px; padding:6px 8px; font-size:11px; display:flex; flex-direction:column; gap:2px; }
   .chip b{ color:var(--gold); font-size:9px; letter-spacing:1px; font-weight:normal; }
@@ -107,6 +114,10 @@
   <div class="voice-panel">
     <button id="micBtn" class="mic-btn" type="button">🎤 テーマを話す</button>
     <input id="topicInput" type="text" placeholder="話すか、直接ここに入力（例：ヘッドスパキャンペーン）" />
+    <div class="mode-toggle">
+      <button id="modeTemplate" class="mode-btn active" type="button">🖼 テンプレート画像</button>
+      <button id="modeAI" class="mode-btn" type="button">🎨 AI画像生成(Gemini)</button>
+    </div>
     <button id="genBtn" class="gen-btn" type="button">この内容で生成</button>
     <div id="genStatus" class="gen-status"></div>
   </div>
@@ -575,12 +586,67 @@
 
   // ---------- voice input + GAS-generated caption ----------
   // GASでWeb Appをデプロイしたら、そのURLをここに入れてください。
-  const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyadu6CgbhT-0XNC8GmnRTA5YSNnmCsGHzK8IIaFB9ZWyNyE2Vh0VeNRoQl6BZhrTtvhw/exec';
+  const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzuS3MkokoqWxTHN3cfd60KnDaagDWFMEYBTKZtadr-V4rG5nxrk5C5e6cWSXsPVH7wiQ/exec';
 
   const micBtn = document.getElementById('micBtn');
   const topicInput = document.getElementById('topicInput');
   const genBtn = document.getElementById('genBtn');
   const genStatus = document.getElementById('genStatus');
+  const modeTemplateBtn = document.getElementById('modeTemplate');
+  const modeAIBtn = document.getElementById('modeAI');
+
+  let imageMode = 'template'; // 'template' = SKILL.mdと同じくテキストをテンプレートに埋め込む / 'ai' = Geminiで新規生成
+  modeTemplateBtn.addEventListener('click', ()=>{
+    imageMode = 'template';
+    modeTemplateBtn.classList.add('active');
+    modeAIBtn.classList.remove('active');
+  });
+  modeAIBtn.addEventListener('click', ()=>{
+    imageMode = 'ai';
+    modeAIBtn.classList.add('active');
+    modeTemplateBtn.classList.remove('active');
+  });
+
+  // 本番のSKILL.md(②テンプレートに文字を埋め込む→③スクリーンショット)と同じ発想で、
+  // テキストをブランド風テンプレートに描き込んで画像化する（外部APIを使わない・無料・確実に動く）
+  function renderTemplateImage(headline){
+    const cv = document.createElement('canvas');
+    cv.width = 800; cv.height = 500;
+    const ctx2 = cv.getContext('2d');
+    const grad = ctx2.createLinearGradient(0,0,800,500);
+    grad.addColorStop(0,'#2f8f73'); grad.addColorStop(0.55,'#4ecca3'); grad.addColorStop(1,'#2f8f73');
+    ctx2.fillStyle = grad; ctx2.fillRect(0,0,800,500);
+
+    // decorative frame
+    ctx2.strokeStyle = 'rgba(255,255,255,0.55)'; ctx2.lineWidth = 3;
+    ctx2.strokeRect(24,24,752,452);
+
+    // headline text (auto line-wrap)
+    ctx2.fillStyle = '#ffffff';
+    ctx2.font = "bold 54px 'DotGothic16', sans-serif";
+    ctx2.textAlign = 'center'; ctx2.textBaseline='middle';
+    ctx2.shadowColor='rgba(0,0,0,0.35)'; ctx2.shadowBlur=8; ctx2.shadowOffsetY=3;
+    const words = headline.split('');
+    let lines = [], cur = '';
+    words.forEach(ch=>{
+      const test = cur + ch;
+      if(ctx2.measureText(test).width > 620){ lines.push(cur); cur = ch; }
+      else { cur = test; }
+    });
+    if(cur) lines.push(cur);
+    if(lines.length > 4) lines = lines.slice(0,4);
+    const lineH = 66;
+    const startY = 250 - ((lines.length-1)*lineH)/2;
+    lines.forEach((line,i)=>{ ctx2.fillText(line, 400, startY + i*lineH); });
+    ctx2.shadowBlur = 0;
+
+    // small brand wordmark
+    ctx2.font = "22px 'DotGothic16', sans-serif";
+    ctx2.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx2.fillText('Dulce', 400, 440);
+
+    return cv.toDataURL('image/png');
+  }
 
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(SpeechRec){
@@ -620,13 +686,15 @@
       return;
     }
     genBtn.disabled = true; micBtn.disabled = true;
-    genStatus.textContent='生成中…（文章と画像をAIが作っています。10秒ほどかかることがあります）';
+    genStatus.textContent = imageMode==='ai'
+      ? '生成中…（文章と画像をAIが作っています。10秒ほどかかることがあります）'
+      : '生成中…（文章を生成し、テンプレートに埋め込んでいます）';
     genStatus.className='gen-status';
     try{
       const res = await fetch(GAS_WEBAPP_URL, {
         method:'POST',
         headers:{ 'Content-Type':'text/plain;charset=utf-8' }, // GASのCORSプリフライト回避のためtext/plainで送る
-        body: JSON.stringify({ topic })
+        body: JSON.stringify({ topic, mode: imageMode })
       });
       const data = await res.json();
       if(!data.ok) throw new Error(data.error || '生成に失敗しました');
@@ -636,18 +704,13 @@
 
       const ppImg = document.getElementById('ppImageImg');
       const ppText = document.getElementById('ppImageText');
-      if(data.image){
-        ppImg.src = data.image;
-        ppImg.style.display = 'block';
-        ppText.style.display = 'none';
-      } else {
-        ppImg.style.display = 'none';
-        ppText.style.display = 'block';
-        ppText.textContent = topic;
-      }
+      const finalImage = (imageMode === 'ai' && data.image) ? data.image : renderTemplateImage(topic);
+      ppImg.src = finalImage;
+      ppImg.style.display = 'block';
+      ppText.style.display = 'none';
 
-      genStatus.textContent = data.imageError
-        ? '文章は生成できましたが、画像生成でエラーが出ました（' + data.imageError + '）。①から流れます…'
+      genStatus.textContent = (imageMode === 'ai' && data.imageError)
+        ? '文章は生成できましたが、AI画像生成でエラーが出たためテンプレート画像を使いました（' + data.imageError + '）。①から流れます…'
         : '生成できました。①から流れます…';
       enterSeg(0);
     } catch(err){
