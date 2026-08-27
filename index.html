@@ -81,6 +81,13 @@
   }
   .pp-image-text{ color:#fff; font-size:16px; font-weight:bold; line-height:1.5; text-shadow:1px 2px 5px rgba(0,0,0,.45); }
   .pp-caption{ padding:10px 12px; font-size:11px; line-height:1.7; color:#eef0ff; white-space:pre-wrap; }
+  .pp-actions{ display:flex; align-items:center; gap:8px; padding:0 12px 10px 12px; flex-wrap:wrap; }
+  .pp-btn{
+    font-family:inherit; font-size:10px; color:#fff2c8; text-decoration:none;
+    background:var(--gold-dim); border:2px solid var(--gold); border-radius:12px;
+    padding:6px 12px; cursor:pointer; display:inline-block;
+  }
+  .pp-copy-status{ font-size:10px; color:#9adfc0; }
   @media (max-width:480px){
     .pp-image{ height:90px; }
     .pp-image-text{ font-size:13px; }
@@ -146,6 +153,11 @@
       <div class="pp-image-text" id="ppImageText">まだ生成されていません</div>
     </div>
     <div class="pp-caption" id="ppCaption">「テーマを話す」→「この内容で生成」を実行すると、ここに実際の投稿文が表示されます。</div>
+    <div class="pp-actions">
+      <button id="copyCaptionBtn" class="pp-btn" type="button">📋 文章をコピー</button>
+      <a id="downloadImageBtn" class="pp-btn" download="post-image.png" style="display:none;">💾 画像を保存</a>
+      <span id="copyStatus" class="pp-copy-status"></span>
+    </div>
   </div>
 
   <div class="foot">PROTOTYPE — ローポリ3Dモデルはオリジナル制作物です（特定作品のモデルデータではありません）</div>
@@ -371,6 +383,15 @@
     return spr;
   }
 
+  // 既存のラベル/吹き出しスプライトのテキストを差し替える（毎回新しいテクスチャを作って貼り直す）
+  function setSpriteText(sprite, text, color, worldHeight){
+    const fresh = makeLabelSprite(text, color, { worldHeight: worldHeight });
+    if(sprite.material.map) sprite.material.map.dispose();
+    sprite.material.map = fresh.material.map;
+    sprite.material.needsUpdate = true;
+    sprite.scale.copy(fresh.scale);
+  }
+
   // ---------- desk ----------
   function buildDesk(color, label){
     const g = new THREE.Group();
@@ -515,9 +536,8 @@
     nameTag.position.set(0, 1.85, 0);
     built.group.add(nameTag);
 
-    const bubble = makeLabelSprite('…', '#ffffff');
-    bubble.scale.set(0.55, 0.24, 1);
-    bubble.position.set(0, 2.15, 0);
+    const bubble = makeLabelSprite('…', '#ffffff', { worldHeight: 0.24 });
+    bubble.position.set(0.4, 2.2, 0);
     bubble.visible = false;
     built.group.add(bubble);
     s.chatBubble = bubble;
@@ -576,6 +596,18 @@
   function showPostPreview(show){
     document.getElementById('postPreview').classList.toggle('show', show);
   }
+
+  document.getElementById('copyCaptionBtn').addEventListener('click', async ()=>{
+    const status = document.getElementById('copyStatus');
+    if(!CAMPAIGN_CAPTION){ status.textContent = 'まだ文章が生成されていません'; return; }
+    try{
+      await navigator.clipboard.writeText(CAMPAIGN_CAPTION);
+      status.textContent = 'コピーしました！';
+    }catch(e){
+      status.textContent = 'コピーに失敗しました（手動で選択してコピーしてください）';
+    }
+    setTimeout(()=>{ status.textContent=''; }, 3000);
+  });
 
   // ---------- voice input + GAS-generated caption ----------
   // GASでWeb Appをデプロイしたら、そのURLをここに入れてください。
@@ -702,6 +734,7 @@
       ? '生成中…（文章と画像をAIが作っています。10秒ほどかかることがあります）'
       : '生成中…（文章を生成し、テンプレートに埋め込んでいます）';
     genStatus.className='gen-status';
+    holdOnDone = true;
     enterSeg(0); // ここでアニメーションを即座に開始し、実際のAI生成と同時進行させる
     try{
       const res = await fetch(GAS_WEBAPP_URL, {
@@ -722,6 +755,10 @@
       ppImg.src = finalImage;
       ppImg.style.display = 'block';
       ppText.style.display = 'none';
+
+      const downloadBtn = document.getElementById('downloadImageBtn');
+      downloadBtn.href = finalImage;
+      downloadBtn.style.display = 'inline-block';
 
       genStatus.textContent = (imageMode === 'ai' && data.imageError)
         ? '文章は生成できましたが、AI画像生成でエラーが出たためテンプレート画像を使いました（' + data.imageError + '）。まもなくプレビューに反映されます。'
@@ -848,25 +885,35 @@
     }catch(e){ liveMode = false; }
   }
 
+  function hideAllBubbles(){ STATIONS.forEach(s=>{ s.chatBubble.visible = false; }); }
+  function showBubble(id, text){
+    const s = STATIONS.find(x=>x.id===id);
+    setSpriteText(s.chatBubble, text, '#ffffff', 0.24);
+    s.chatBubble.visible = true;
+  }
+
+  let holdOnDone = false; // 実際にAI生成した結果が出た後は、次の周に流れず留めておく
+
   function enterSeg(i){
     seqIdx = i; segT = 0;
     const seg = SEQ[i];
     travel = null; // always clear on entry — nothing "in transit" unless this segment says so
-    if(seg.key==='brainstorm'){ setFlavorMsg('brainstorm'); itemVisible=false; showPostPreview(false); }
-    if(seg.key==='gen'){ setMsg(0); STATIONS[IDX.creator].atb=0; itemVisible=false; }
+    hideAllBubbles();
+    if(seg.key==='brainstorm'){ setFlavorMsg('brainstorm'); itemVisible=false; showPostPreview(false); showBubble('ideaA','ネタ出し中…'); showBubble('ideaB','いいね、それで行こう！'); }
+    if(seg.key==='gen'){ setMsg(0); STATIONS[IDX.creator].atb=0; itemVisible=false; showBubble('creator','執筆中…'); }
     if(seg.key==='travelA'){ travel={from:IDX.creator,to:IDX.reviewA}; itemStage='text'; itemVisible=true; itemOwner=IDX.reviewA; }
-    if(seg.key==='evalDiscuss'){ setFlavorMsg('evalDiscuss'); itemOwner=IDX.reviewA; }
+    if(seg.key==='evalDiscuss'){ setFlavorMsg('evalDiscuss'); itemOwner=IDX.reviewA; showBubble('reviewA','ここ直そうか'); showBubble('reviewB','いいと思う！'); }
     if(seg.key==='travelB'){ travel={from:IDX.reviewA,to:IDX.tmplbot}; itemStage='text'; itemOwner=IDX.tmplbot; }
-    if(seg.key==='tmplProc'){ setMsg(1); STATIONS[IDX.tmplbot].atb=0; itemStage='template'; itemOwner=IDX.tmplbot; }
+    if(seg.key==='tmplProc'){ setMsg(1); STATIONS[IDX.tmplbot].atb=0; itemStage='template'; itemOwner=IDX.tmplbot; showBubble('tmplbot','合成中…'); }
     if(seg.key==='travelC'){ travel={from:IDX.tmplbot,to:IDX.shotbot}; itemStage='template'; itemOwner=IDX.shotbot; }
-    if(seg.key==='shotProc'){ setMsg(2); STATIONS[IDX.shotbot].atb=0; itemStage='image'; itemOwner=IDX.shotbot; }
+    if(seg.key==='shotProc'){ setMsg(2); STATIONS[IDX.shotbot].atb=0; itemStage='image'; itemOwner=IDX.shotbot; showBubble('shotbot','撮影中…'); }
     if(seg.key==='travelD'){ travel={from:IDX.shotbot,to:IDX.upbot}; itemStage='image'; itemOwner=IDX.upbot; }
-    if(seg.key==='upProc'){ setMsg(3); STATIONS[IDX.upbot].atb=0; itemStage='imageurl'; itemOwner=IDX.upbot; }
+    if(seg.key==='upProc'){ setMsg(3); STATIONS[IDX.upbot].atb=0; itemStage='imageurl'; itemOwner=IDX.upbot; showBubble('upbot','アップロード中…'); }
     if(seg.key==='travelE'){ travel={from:IDX.upbot,to:IDX.poster}; itemStage='imageurl'; itemOwner=IDX.poster; }
-    if(seg.key==='ig'){ setMsg(4); STATIONS[IDX.poster].atb=0; itemVisible=false; }
-    if(seg.key==='threads'){ setMsg(5); STATIONS[IDX.poster].atb=0; }
-    if(seg.key==='log'){ setMsg(6); STATIONS[IDX.poster].atb=0; }
-    if(seg.key==='donePause'){ posts+=1; document.getElementById('statPosts').textContent = posts; showPostPreview(true); }
+    if(seg.key==='ig'){ setMsg(4); STATIONS[IDX.poster].atb=0; itemVisible=false; showBubble('poster','Instagramに予約中…'); }
+    if(seg.key==='threads'){ setMsg(5); STATIONS[IDX.poster].atb=0; showBubble('poster','Threadsに予約中…'); }
+    if(seg.key==='log'){ setMsg(6); STATIONS[IDX.poster].atb=0; showBubble('poster','記録・通知中…'); }
+    if(seg.key==='donePause'){ posts+=1; document.getElementById('statPosts').textContent = posts; showPostPreview(true); showBubble('poster','できました！'); }
     if(seg.key==='resetPause'){ cycle+=1; document.getElementById('statCycle').textContent = cycle+' 周目'; }
   }
   enterSeg(0);
@@ -883,7 +930,9 @@
     if(seg.key && seg.key.indexOf('travel')===0) travel.progress = t;
     if(segT >= seg.dur){
       const holdForReal = liveMode && (STEP_TO_SEGKEY.includes(seg.key) || seg.key==='resetPause');
+      const holdForResult = holdOnDone && seg.key==='donePause';
       if(holdForReal){ liveWaiting = true; segT = seg.dur; }
+      else if(holdForResult){ segT = seg.dur; } // 実際に生成した結果はここで止めておく（コピーできるように）
       else { enterSeg((seqIdx+1) % SEQ.length); }
     }
   }
@@ -948,8 +997,6 @@
     const chatPair = seg.key==='brainstorm' ? [IDX.ideaA,IDX.ideaB] : seg.key==='evalDiscuss' ? [IDX.reviewA,IDX.reviewB] : null;
     const designerChat = seg.key==='tmplProc' && Math.sin(time*1.3) > 0.25;
 
-    STATIONS.forEach(s=>{ s.chatBubble.visible = false; });
-
     STATIONS.forEach((s,i)=>{
       if(i===travelIdx) return;
       s.model.group.position.set(s.homeX, 0, s.homeZ);
@@ -966,13 +1013,17 @@
 
     if(chatPair){
       animateChat(STATIONS[chatPair[0]], STATIONS[chatPair[1]], dt);
-      STATIONS[chatPair[0]].chatBubble.visible = true;
-      STATIONS[chatPair[1]].chatBubble.visible = true;
     }
-    if(designerChat){
-      animateChat(STATIONS[IDX.tmplbot], STATIONS[IDX.designer], dt);
-      STATIONS[IDX.tmplbot].chatBubble.visible = true;
-      STATIONS[IDX.designer].chatBubble.visible = true;
+    // デザイン相談役だけは、テンプレ合成中に時々「できました？」と話しかける演出（吹き出しをその時だけ切り替える）
+    if(seg.key==='tmplProc'){
+      const designer = STATIONS[IDX.designer];
+      if(designerChat){
+        animateChat(STATIONS[IDX.tmplbot], designer, dt);
+        setSpriteText(designer.chatBubble, 'できました？', '#ffffff', 0.24);
+        designer.chatBubble.visible = true;
+      } else {
+        designer.chatBubble.visible = false;
+      }
     }
 
     // traveler (walking / hovering between two desks, carrying the item)
