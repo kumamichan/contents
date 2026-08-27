@@ -42,8 +42,9 @@
   .gen-btn{ background:var(--gold-dim); border-color:var(--gold); }
   .gen-btn:disabled, .mic-btn:disabled{ opacity:.5; cursor:default; }
   #topicInput{
-    flex:1 1 160px; min-width:120px; font-family:inherit; font-size:11px; color:#f4f6ff;
-    background:#141d3a; border:2px solid var(--gold-dim); border-radius:14px; padding:7px 12px;
+    flex:1 1 100%; width:100%; box-sizing:border-box; font-family:inherit; font-size:11px; color:#f4f6ff;
+    background:#141d3a; border:2px solid var(--gold-dim); border-radius:10px; padding:8px 12px;
+    resize:vertical; line-height:1.6; min-height:52px; max-height:160px; overflow-y:auto;
   }
   .gen-status{ flex:1 1 100%; font-size:10px; color:#9adfc0; min-height:14px; }
   .gen-status.error{ color:#ff9fae; }
@@ -113,7 +114,7 @@
 
   <div class="voice-panel">
     <button id="micBtn" class="mic-btn" type="button">🎤 テーマを話す</button>
-    <input id="topicInput" type="text" placeholder="話すか、直接ここに入力（例：ヘッドスパキャンペーン）" />
+    <textarea id="topicInput" rows="3" placeholder="話すか、直接ここに入力（例：ヘッドスパキャンペーン）"></textarea>
     <div class="mode-toggle">
       <button id="modeTemplate" class="mode-btn active" type="button">🖼 テンプレート画像</button>
       <button id="modeAI" class="mode-btn" type="button">🎨 AI画像生成(Gemini)</button>
@@ -586,7 +587,7 @@
 
   // ---------- voice input + GAS-generated caption ----------
   // GASでWeb Appをデプロイしたら、そのURLをここに入れてください。
-  const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby--c0TD05XemBKu2-8XRjVqI0qCQ6FbFbbxWxL8KUw5ln4PXQ5uUOEy5WKvQ8Ue0Nh8Q/exec';
+  const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyhZ5Hy0i0zkNAvNMk4_l6D7A8v4iZF5wrigEBBFFEMvyzfsw87DesNw5ak3-aEo7uKiQ/exec';
 
   const micBtn = document.getElementById('micBtn');
   const topicInput = document.getElementById('topicInput');
