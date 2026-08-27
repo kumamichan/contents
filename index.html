@@ -160,7 +160,7 @@
     </div>
   </div>
 
-  <div class="foot">PROTOTYPE — ローポリ3Dモデルはオリジナル制作物です（特定作品のモデルデータではありません） / build: 2026-08-27-v3（演出セリフを明示）</div>
+  <div class="foot">PROTOTYPE — ローポリ3Dモデルはオリジナル制作物です（特定作品のモデルデータではありません） / build: 2026-08-27-v4（1080角＋写真合成）</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
@@ -632,45 +632,126 @@
     modeTemplateBtn.classList.remove('active');
   });
 
-  // 本番のSKILL.md(②テンプレートに文字を埋め込む→③スクリーンショット)と同じ発想で、
-  // テキストをブランド風テンプレートに描き込んで画像化する（外部APIを使わない・無料・確実に動く）
-  function renderTemplateImage(headline){
-    const cv = document.createElement('canvas');
-    cv.width = 800; cv.height = 500;
-    const ctx2 = cv.getContext('2d');
-    const grad = ctx2.createLinearGradient(0,0,800,500);
-    grad.addColorStop(0,'#2f8f73'); grad.addColorStop(0.55,'#4ecca3'); grad.addColorStop(1,'#2f8f73');
-    ctx2.fillStyle = grad; ctx2.fillRect(0,0,800,500);
+  const IG_SIZE = 1080; // Instagram正方形投稿の標準サイズ
 
-    // decorative frame
-    ctx2.strokeStyle = 'rgba(255,255,255,0.55)'; ctx2.lineWidth = 3;
-    ctx2.strokeRect(24,24,752,452);
-
-    // headline text (auto line-wrap)
-    ctx2.fillStyle = '#ffffff';
-    ctx2.font = "bold 54px 'DotGothic16', sans-serif";
-    ctx2.textAlign = 'center'; ctx2.textBaseline='middle';
-    ctx2.shadowColor='rgba(0,0,0,0.35)'; ctx2.shadowBlur=8; ctx2.shadowOffsetY=3;
-    const words = headline.split('');
+  function wrapLines(ctx2, text, maxWidth, maxLines){
+    const chars = text.split('');
     let lines = [], cur = '';
-    words.forEach(ch=>{
+    chars.forEach(ch=>{
       const test = cur + ch;
-      if(ctx2.measureText(test).width > 620){ lines.push(cur); cur = ch; }
+      if(ctx2.measureText(test).width > maxWidth){ lines.push(cur); cur = ch; }
       else { cur = test; }
     });
     if(cur) lines.push(cur);
-    if(lines.length > 4) lines = lines.slice(0,4);
-    const lineH = 66;
-    const startY = 250 - ((lines.length-1)*lineH)/2;
-    lines.forEach((line,i)=>{ ctx2.fillText(line, 400, startY + i*lineH); });
+    if(maxLines && lines.length > maxLines) lines = lines.slice(0, maxLines);
+    return lines;
+  }
+
+  // 本番のSKILL.md(②テンプレートに文字を埋め込む→③スクリーンショット)と同じ発想で、
+  // テキストをブランド風テンプレートに描き込んで画像化する（外部APIを使わない・無料・確実に動く）
+  function renderTemplateImage(headline){
+    const S = IG_SIZE;
+    const cv = document.createElement('canvas');
+    cv.width = S; cv.height = S;
+    const ctx2 = cv.getContext('2d');
+
+    const grad = ctx2.createLinearGradient(0,0,S,S);
+    grad.addColorStop(0,'#2f8f73'); grad.addColorStop(0.55,'#4ecca3'); grad.addColorStop(1,'#1f6b53');
+    ctx2.fillStyle = grad; ctx2.fillRect(0,0,S,S);
+
+    // ふんわりした光のボケ（写真っぽい奥行きを出す）
+    ctx2.globalAlpha = 0.22;
+    [[220,260,190],[860,200,140],[820,880,220],[200,900,150]].forEach(([x,y,r])=>{
+      const g = ctx2.createRadialGradient(x,y,0,x,y,r);
+      g.addColorStop(0,'#ffffff'); g.addColorStop(1,'rgba(255,255,255,0)');
+      ctx2.fillStyle = g; ctx2.beginPath(); ctx2.arc(x,y,r,0,Math.PI*2); ctx2.fill();
+    });
+    ctx2.globalAlpha = 1;
+
+    // 全体に軽いビネット
+    const vig = ctx2.createRadialGradient(S/2,S/2,S*0.35,S/2,S/2,S*0.72);
+    vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.28)');
+    ctx2.fillStyle = vig; ctx2.fillRect(0,0,S,S);
+
+    // 装飾フレーム
+    ctx2.strokeStyle = 'rgba(255,255,255,0.55)'; ctx2.lineWidth = 5;
+    ctx2.strokeRect(40,40,S-80,S-80);
+
+    // 見出しの背景バッジ（写真の上に文字を乗せたような見え方にする）
+    ctx2.font = "bold 76px 'DotGothic16', sans-serif";
+    ctx2.textAlign = 'center'; ctx2.textBaseline = 'middle';
+    const lines = wrapLines(ctx2, headline, S*0.74, 3);
+    const lineH = 92;
+    const badgePad = 50;
+    const badgeH = lines.length*lineH + badgePad*2 - 20;
+    const badgeY = S/2 - badgeH/2;
+    ctx2.fillStyle = 'rgba(10,20,20,0.32)';
+    roundRect(ctx2, S*0.08, badgeY, S*0.84, badgeH, 28);
+    ctx2.fill();
+
+    ctx2.fillStyle = '#ffffff';
+    ctx2.shadowColor='rgba(0,0,0,0.4)'; ctx2.shadowBlur=14; ctx2.shadowOffsetY=4;
+    const startY = S/2 - ((lines.length-1)*lineH)/2;
+    lines.forEach((line,i)=>{ ctx2.fillText(line, S/2, startY + i*lineH); });
     ctx2.shadowBlur = 0;
 
-    // small brand wordmark
-    ctx2.font = "22px 'DotGothic16', sans-serif";
-    ctx2.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx2.fillText('Dulce', 400, 440);
+    // 小さなブランド表記
+    ctx2.font = "34px 'DotGothic16', sans-serif";
+    ctx2.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx2.fillText('Dulce', S/2, S - 90);
 
     return cv.toDataURL('image/png');
+  }
+
+  function roundRect(ctx2, x, y, w, h, r){
+    ctx2.beginPath();
+    ctx2.moveTo(x+r,y);
+    ctx2.arcTo(x+w,y,x+w,y+h,r);
+    ctx2.arcTo(x+w,y+h,x,y+h,r);
+    ctx2.arcTo(x,y+h,x,y,r);
+    ctx2.arcTo(x,y,x+w,y,r);
+    ctx2.closePath();
+  }
+
+  // AIが生成した実際の写真の上に、見出しテキストを合成する（写真＋文字のセミナー映えする見た目にする）
+  function compositeTextOnImage(dataUrl, headline){
+    const S = IG_SIZE;
+    return new Promise((resolve)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const cv = document.createElement('canvas');
+        cv.width = S; cv.height = S;
+        const ctx2 = cv.getContext('2d');
+
+        // カバー方式で正方形にトリミング配置
+        const scale = Math.max(S/img.width, S/img.height);
+        const dw = img.width*scale, dh = img.height*scale;
+        ctx2.drawImage(img, (S-dw)/2, (S-dh)/2, dw, dh);
+
+        // 下側に文字を読みやすくするグラデーションの帯
+        const grad = ctx2.createLinearGradient(0, S*0.5, 0, S);
+        grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(1,'rgba(0,0,0,0.68)');
+        ctx2.fillStyle = grad; ctx2.fillRect(0, S*0.5, S, S*0.5);
+
+        ctx2.font = "bold 72px 'DotGothic16', sans-serif";
+        ctx2.textAlign = 'center'; ctx2.textBaseline = 'alphabetic';
+        const lines = wrapLines(ctx2, headline, S*0.82, 3);
+        const lineH = 86;
+        ctx2.fillStyle = '#ffffff';
+        ctx2.shadowColor='rgba(0,0,0,0.6)'; ctx2.shadowBlur=16; ctx2.shadowOffsetY=4;
+        const baseY = S - 110 - (lines.length-1)*lineH;
+        lines.forEach((line,i)=>{ ctx2.fillText(line, S/2, baseY + i*lineH); });
+        ctx2.shadowBlur = 0;
+
+        ctx2.font = "30px 'DotGothic16', sans-serif";
+        ctx2.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx2.fillText('Dulce', S/2, S - 40);
+
+        resolve(cv.toDataURL('image/png'));
+      };
+      img.onerror = ()=> resolve(dataUrl); // 読み込み失敗時は元画像をそのまま使う
+      img.src = dataUrl;
+    });
   }
 
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -751,7 +832,9 @@
 
       const ppImg = document.getElementById('ppImageImg');
       const ppText = document.getElementById('ppImageText');
-      const finalImage = (imageMode === 'ai' && data.image) ? data.image : renderTemplateImage(data.headline);
+      const finalImage = (imageMode === 'ai' && data.image)
+        ? await compositeTextOnImage(data.image, data.headline)
+        : renderTemplateImage(data.headline);
       ppImg.src = finalImage;
       ppImg.style.display = 'block';
       ppText.style.display = 'none';
