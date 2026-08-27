@@ -587,7 +587,7 @@
 
   // ---------- voice input + GAS-generated caption ----------
   // GASでWeb Appをデプロイしたら、そのURLをここに入れてください。
-  const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzDTNdvRMIYVO3iCimaIXMkZRz6G2rf86bGIqIFRrGeQ2on6g4E0XH3XHOdLzkno3D5gw/exec';
+  const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx6SmbKRHH-LmH-bAtl1OMYJD_6jBK-1Y1Pilk_Y_tTuupwPJ0S877mooGgj6l6ajhMTw/exec';
 
   const micBtn = document.getElementById('micBtn');
   const topicInput = document.getElementById('topicInput');
@@ -713,6 +713,7 @@
     try{
       const res = await fetch(GAS_WEBAPP_URL, {
         method:'POST',
+        cache:'no-store',
         headers:{ 'Content-Type':'text/plain;charset=utf-8' }, // GASのCORSプリフライト回避のためtext/plainで送る
         body: JSON.stringify({ topic, mode: imageMode })
       });
