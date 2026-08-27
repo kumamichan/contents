@@ -586,7 +586,7 @@
 
   // ---------- voice input + GAS-generated caption ----------
   // GASでWeb Appをデプロイしたら、そのURLをここに入れてください。
-  const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzuS3MkokoqWxTHN3cfd60KnDaagDWFMEYBTKZtadr-V4rG5nxrk5C5e6cWSXsPVH7wiQ/exec';
+  const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby--c0TD05XemBKu2-8XRjVqI0qCQ6FbFbbxWxL8KUw5ln4PXQ5uUOEy5WKvQ8Ue0Nh8Q/exec';
 
   const micBtn = document.getElementById('micBtn');
   const topicInput = document.getElementById('topicInput');
@@ -649,29 +649,48 @@
   }
 
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let listening = false;
   if(SpeechRec){
     const recognition = new SpeechRec();
     recognition.lang = 'ja-JP';
-    recognition.interimResults = false;
+    recognition.continuous = true;      // 話の途中の間（ま）で切れないよう、止めるまで聞き続ける
+    recognition.interimResults = true;  // 話している途中の文字も随時表示する
     recognition.maxAlternatives = 1;
-    let listening = false;
+
+    let finalTranscript = '';
+
     micBtn.addEventListener('click', ()=>{
-      if(listening) return;
-      listening = true;
-      micBtn.classList.add('listening');
-      micBtn.textContent = '🎤 聞き取り中…';
-      try{ recognition.start(); }catch(e){}
+      if(!listening){
+        listening = true;
+        finalTranscript = topicInput.value ? topicInput.value + ' ' : '';
+        micBtn.classList.add('listening');
+        micBtn.textContent = '⏹ 聞き取りを終了';
+        try{ recognition.start(); }catch(e){}
+      } else {
+        listening = false;
+        micBtn.classList.remove('listening');
+        micBtn.textContent = '🎤 テーマを話す';
+        try{ recognition.stop(); }catch(e){}
+      }
     });
+
     recognition.onresult = (e)=>{
-      topicInput.value = e.results[0][0].transcript;
+      let interim = '';
+      for(let i = e.resultIndex; i < e.results.length; i++){
+        const t = e.results[i][0].transcript;
+        if(e.results[i].isFinal) finalTranscript += t;
+        else interim += t;
+      }
+      topicInput.value = finalTranscript + interim;
     };
-    function stopListening(){
-      listening = false;
-      micBtn.classList.remove('listening');
-      micBtn.textContent = '🎤 テーマを話す';
-    }
-    recognition.onend = stopListening;
-    recognition.onerror = ()=>{ stopListening(); genStatus.textContent='音声認識でエラーが発生しました。直接入力もできます。'; genStatus.className='gen-status error'; };
+    recognition.onerror = (e)=>{
+      genStatus.textContent = '音声認識でエラーが発生しました（' + e.error + '）。直接入力もできます。';
+      genStatus.className = 'gen-status error';
+    };
+    recognition.onend = ()=>{
+      // ボタンで止めていないのに切れた場合（ブラウザ側の無音タイムアウト等）は自動で再開する
+      if(listening){ try{ recognition.start(); }catch(e){} }
+    };
   } else {
     micBtn.disabled = true;
     micBtn.textContent = '🎤 音声入力非対応';
@@ -700,11 +719,11 @@
       if(!data.ok) throw new Error(data.error || '生成に失敗しました');
       CAMPAIGN_CAPTION = data.caption;
       document.getElementById('ppCaption').textContent = CAMPAIGN_CAPTION;
-      document.querySelector('.pp-header').textContent = '📮 投稿プレビュー ― ' + topic;
+      document.querySelector('.pp-header').textContent = '📮 投稿プレビュー ― ' + data.headline;
 
       const ppImg = document.getElementById('ppImageImg');
       const ppText = document.getElementById('ppImageText');
-      const finalImage = (imageMode === 'ai' && data.image) ? data.image : renderTemplateImage(topic);
+      const finalImage = (imageMode === 'ai' && data.image) ? data.image : renderTemplateImage(data.headline);
       ppImg.src = finalImage;
       ppImg.style.display = 'block';
       ppText.style.display = 'none';
