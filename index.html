@@ -140,12 +140,12 @@
   </div>
 
   <div class="post-preview" id="postPreview">
-    <div class="pp-header">📮 投稿プレビュー ― Dulce ヘッドスパキャンペーン</div>
+    <div class="pp-header">📮 投稿プレビュー</div>
     <div class="pp-image" id="ppImage">
       <img id="ppImageImg" style="display:none;width:100%;height:100%;object-fit:cover;" alt="生成画像" />
-      <div class="pp-image-text" id="ppImageText">頭皮も、心も。<br>ヘッドスパキャンペーン</div>
+      <div class="pp-image-text" id="ppImageText">まだ生成されていません</div>
     </div>
-    <div class="pp-caption" id="ppCaption"></div>
+    <div class="pp-caption" id="ppCaption">「テーマを話す」→「この内容で生成」を実行すると、ここに実際の投稿文が表示されます。</div>
   </div>
 
   <div class="foot">PROTOTYPE — ローポリ3Dモデルはオリジナル制作物です（特定作品のモデルデータではありません）</div>
@@ -571,16 +571,8 @@
   let itemOwner = IDX.creator; // station index currently holding the item when not in transit
 
   // ---------- final post preview (shown once the pipeline completes a cycle) ----------
-  let CAMPAIGN_CAPTION =
-'髪だけじゃなく、頭皮からきれいを整える時間を。\n\n' +
-'Dulceのヘッドスパは、凝り固まった頭皮をほぐしながら血行を促進し、髪本来のツヤとハリを引き出します🌿\n\n' +
-'・肩や首のコリが気になる方\n' +
-'・最近髪にツヤがないと感じる方\n' +
-'・とにかくゆっくりリラックスしたい方\n\n' +
-'そんな方にこそ試してほしいメニューです。\n\n' +
-'ご予約はプロフィールのリンクから🔗\n\n' +
-'#ヘッドスパ #札幌美容室 #Dulce #頭皮ケア #リラックスタイム';
-  document.getElementById('ppCaption').textContent = CAMPAIGN_CAPTION;
+  // 実際に生成されるまではプレースホルダーのまま（HTML側で初期表示済み）
+  let CAMPAIGN_CAPTION = '';
   function showPostPreview(show){
     document.getElementById('postPreview').classList.toggle('show', show);
   }
@@ -710,6 +702,7 @@
       ? '生成中…（文章と画像をAIが作っています。10秒ほどかかることがあります）'
       : '生成中…（文章を生成し、テンプレートに埋め込んでいます）';
     genStatus.className='gen-status';
+    enterSeg(0); // ここでアニメーションを即座に開始し、実際のAI生成と同時進行させる
     try{
       const res = await fetch(GAS_WEBAPP_URL, {
         method:'POST',
@@ -731,9 +724,8 @@
       ppText.style.display = 'none';
 
       genStatus.textContent = (imageMode === 'ai' && data.imageError)
-        ? '文章は生成できましたが、AI画像生成でエラーが出たためテンプレート画像を使いました（' + data.imageError + '）。①から流れます…'
-        : '生成できました。①から流れます…';
-      enterSeg(0);
+        ? '文章は生成できましたが、AI画像生成でエラーが出たためテンプレート画像を使いました（' + data.imageError + '）。まもなくプレビューに反映されます。'
+        : '生成できました。まもなくプレビューに反映されます。';
     } catch(err){
       genStatus.textContent = 'エラー: ' + err.message;
       genStatus.className='gen-status error';
