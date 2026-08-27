@@ -73,7 +73,7 @@
     transition:max-height .5s ease, opacity .5s ease, margin-top .5s ease;
     border:3px solid var(--gold); border-radius:4px; background:var(--panel);
   }
-  .post-preview.show{ margin-top:8px; max-height:900px; opacity:1; }
+  .post-preview.show{ margin-top:8px; max-height:2600px; opacity:1; }
   .pp-header{ font-size:10px; color:#fff2c8; background:var(--gold-dim); padding:5px 10px; letter-spacing:.5px; }
   .pp-image{
     position:relative; width:100%; aspect-ratio:1/1; background:linear-gradient(135deg,#2f8f73,#4ecca3 55%,#2f8f73);
@@ -127,11 +127,6 @@
       <button id="modePhoto" class="mode-btn" type="button">📷 用意した写真</button>
       <button id="modeAI" class="mode-btn" type="button">🎨 AI画像生成(Gemini)</button>
     </div>
-    <div class="photo-picker" id="photoPicker" style="display:none;">
-      <label class="pp-btn" for="photoUpload" style="cursor:pointer;">📁 セミナー前に写真を選んでおく</label>
-      <input id="photoUpload" type="file" accept="image/*" style="display:none;" />
-      <span id="photoPickStatus" class="gen-status"></span>
-    </div>
     <button id="genBtn" class="gen-btn" type="button">この内容で生成</button>
     <div id="genStatus" class="gen-status"></div>
   </div>
@@ -166,7 +161,7 @@
     </div>
   </div>
 
-  <div class="foot">PROTOTYPE — ローポリ3Dモデルはオリジナル制作物です（特定作品のモデルデータではありません） / build: 2026-08-27-v7（既定画像を埋め込み・文章のみその場生成）</div>
+  <div class="foot">PROTOTYPE — ローポリ3Dモデルはオリジナル制作物です（特定作品のモデルデータではありません） / build: 2026-08-27-v9（生成開始まで待機）</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
@@ -626,9 +621,6 @@
   const modeTemplateBtn = document.getElementById('modeTemplate');
   const modePhotoBtn = document.getElementById('modePhoto');
   const modeAIBtn = document.getElementById('modeAI');
-  const photoPicker = document.getElementById('photoPicker');
-  const photoUpload = document.getElementById('photoUpload');
-  const photoPickStatus = document.getElementById('photoPickStatus');
 
   // 'template' = SKILL.mdと同じくテキストをテンプレートに埋め込む
   // 'photo'    = あらかじめ用意した写真を使う（セミナー向けの確実な演出）。
@@ -645,26 +637,11 @@
     imageMode = mode;
     [modeTemplateBtn, modePhotoBtn, modeAIBtn].forEach(b=>b.classList.remove('active'));
     ({ template: modeTemplateBtn, photo: modePhotoBtn, ai: modeAIBtn }[mode]).classList.add('active');
-    photoPicker.style.display = (mode === 'photo') ? 'flex' : 'none';
   }
   setMode('photo'); // このデモは「用意した写真」モードを既定にする
-  photoPickStatus.textContent = '✓ 既定の画像を準備済みです（別の写真に差し替えることもできます）';
   modeTemplateBtn.addEventListener('click', ()=> setMode('template'));
   modePhotoBtn.addEventListener('click', ()=> setMode('photo'));
   modeAIBtn.addEventListener('click', ()=> setMode('ai'));
-
-  photoUpload.addEventListener('change', ()=>{
-    const file = photoUpload.files && photoUpload.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ()=>{
-      preparedPhotoDataUrl = reader.result;
-      presetHasOwnText = false; // 新しくアップロードした写真には文字が入っていない前提で、生成時に見出しを合成する
-      photoPickStatus.textContent = '✓ 写真を差し替えました（' + file.name + '）';
-    };
-    reader.onerror = ()=>{ photoPickStatus.textContent = '写真の読み込みに失敗しました'; };
-    reader.readAsDataURL(file);
-  });
 
   const IG_SIZE = 1080; // Instagram正方形投稿の標準サイズ
 
@@ -852,6 +829,7 @@
         : '生成中…（文章を生成し、テンプレートに埋め込んでいます）';
     genStatus.className='gen-status';
     holdOnDone = true;
+    demoRunning = true; // ここで初めてアニメーション・セリフの進行を開始する
     enterSeg(0); // ここでアニメーションを即座に開始し、実際のAI生成と同時進行させる
     try{
       const gasMode = (imageMode === 'ai') ? 'ai' : 'template'; // photo/templateはGAS側の画像生成を呼ばない（コスト・時間の節約）
@@ -888,11 +866,13 @@
       downloadBtn.href = finalImage;
       downloadBtn.style.display = 'inline-block';
 
+      showPostPreview(true); // 生成が終わった時点ですぐに表示する（アニメーション完了を待たない）
+
       genStatus.textContent = (imageMode === 'ai' && data.imageError)
-        ? '文章は生成できましたが、AI画像生成でエラーが出たためテンプレート画像を使いました（' + data.imageError + '）。まもなくプレビューに反映されます。'
+        ? '文章は生成できましたが、AI画像生成でエラーが出たためテンプレート画像を使いました（' + data.imageError + '）。'
         : imageNote
-          ? imageNote + ' まもなくプレビューに反映されます。'
-          : '生成できました。まもなくプレビューに反映されます。';
+          ? imageNote
+          : '生成できました。';
     } catch(err){
       genStatus.textContent = 'エラー: ' + err.message;
       genStatus.className='gen-status error';
@@ -1029,7 +1009,7 @@
     const seg = SEQ[i];
     travel = null; // always clear on entry — nothing "in transit" unless this segment says so
     hideAllBubbles();
-    if(seg.key==='brainstorm'){ setFlavorMsg('brainstorm'); itemVisible=false; showPostPreview(false); showBubble('ideaA','（演出）ネタ出し中'); showBubble('ideaB','いいね、それで！'); }
+    if(seg.key==='brainstorm'){ setFlavorMsg('brainstorm'); itemVisible=false; showBubble('ideaA','（演出）ネタ出し中'); showBubble('ideaB','いいね、それで！'); }
     if(seg.key==='gen'){ setMsg(0); STATIONS[IDX.creator].atb=0; itemVisible=false; showBubble('creator','AIが執筆中…'); }
     if(seg.key==='travelA'){ travel={from:IDX.creator,to:IDX.reviewA}; itemStage='text'; itemVisible=true; itemOwner=IDX.reviewA; }
     if(seg.key==='evalDiscuss'){ setFlavorMsg('evalDiscuss'); itemOwner=IDX.reviewA; showBubble('reviewA','（演出）ここ直そうか'); showBubble('reviewB','いいと思う！'); }
@@ -1047,10 +1027,15 @@
     if(seg.key==='resetPause'){ cycle+=1; document.getElementById('statCycle').textContent = cycle+' 周目'; }
   }
   enterSeg(0);
+  let demoRunning = false; // 「この内容で生成」が押されるまでは進行しない
+  document.getElementById('msgText').textContent = 'テーマを話す（または入力する）→「この内容で生成」を押すと動き出します。';
+  document.getElementById('statPhase').textContent = '待機中';
+  hideAllBubbles();
 
   function lerp(a,b,t){ return a+(b-a)*t; }
 
   function updateStory(dt){
+    if(!demoRunning) return; // 生成が始まるまではアニメーション・セリフを進めない
     segT += dt;
     const seg = SEQ[seqIdx];
     const t = Math.min(1, segT/seg.dur);
