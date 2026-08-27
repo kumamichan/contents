@@ -160,7 +160,7 @@
     </div>
   </div>
 
-  <div class="foot">PROTOTYPE — ローポリ3Dモデルはオリジナル制作物です（特定作品のモデルデータではありません）</div>
+  <div class="foot">PROTOTYPE — ローポリ3Dモデルはオリジナル制作物です（特定作品のモデルデータではありません） / build: 2026-08-27-v3（演出セリフを明示）</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
@@ -798,17 +798,17 @@
   // The step row (①〜⑦) tracks only the real automation. The idea/review/design
   // desks are flavor added on top — they don't correspond to an actual step.
   const STEP_INFO = [
-    { chip:'①生成',     speaker:'creator', name:'制作担当',       text:'投稿文・画像テキストを生成しています…' },
-    { chip:'②合成',     speaker:'system',  name:'自動化スクリプト', text:'image-template.html にテキストを埋め込んでいます…' },
-    { chip:'③撮影',     speaker:'system',  name:'自動化スクリプト', text:'ヘッドレスEdgeでスクリーンショットを撮影中…(post.png)' },
-    { chip:'④UP',       speaker:'system',  name:'自動化スクリプト', text:'ImgBBに画像をアップロード中…画像URLを取得します' },
-    { chip:'⑤IG予約',   speaker:'poster',  name:'投稿担当',       text:'BufferからInstagramへ投稿を予約しています…' },
-    { chip:'⑥Threads', speaker:'poster',  name:'投稿担当',       text:'BufferからThreadsへ投稿を予約しています…' },
-    { chip:'⑦記録',     speaker:'poster',  name:'投稿担当',       text:'draft.txtに記録し、ntfyで完了通知を送りました！' },
+    { chip:'①生成',     speaker:'creator', name:'制作担当',       text:'実際にAIが投稿文・見出しを生成しています…' },
+    { chip:'②合成',     speaker:'system',  name:'自動化スクリプト', text:'（演出）本番の自動化ではここでimage-template.htmlにテキストを埋め込みます' },
+    { chip:'③撮影',     speaker:'system',  name:'自動化スクリプト', text:'（演出）本番ではここでヘッドレスEdgeがスクリーンショットを撮影します(post.png)' },
+    { chip:'④UP',       speaker:'system',  name:'自動化スクリプト', text:'（演出）本番ではここでImgBBに画像をアップロードし、画像URLを取得します' },
+    { chip:'⑤IG予約',   speaker:'poster',  name:'投稿担当',       text:'（演出）本番ではここでBufferからInstagramへ投稿を予約します' },
+    { chip:'⑥Threads', speaker:'poster',  name:'投稿担当',       text:'（演出）本番ではここでBufferからThreadsへ投稿を予約します' },
+    { chip:'⑦記録',     speaker:'poster',  name:'投稿担当',       text:'（演出）本番ではここでdraft.txtに記録し、ntfyで完了通知を送ります' },
   ];
   const FLAVOR_INFO = {
-    brainstorm:  { speaker:'ideaA',   name:'企画担当',  text:'投稿のネタを話し合っています…（社内向けの雰囲気づくりです）' },
-    evalDiscuss: { speaker:'reviewA', name:'校正担当',  text:'原稿の言い回しをふたりで確認しています…' },
+    brainstorm:  { speaker:'ideaA',   name:'企画担当',  text:'（演出）投稿のネタを話し合っています…雰囲気づくりのシーンです' },
+    evalDiscuss: { speaker:'reviewA', name:'校正担当',  text:'（演出）原稿の言い回しをふたりで確認しています…雰囲気づくりのシーンです' },
   };
   const stepRowEl = document.getElementById('stepRow');
   STEP_INFO.forEach((s,i)=>{
@@ -899,21 +899,21 @@
     const seg = SEQ[i];
     travel = null; // always clear on entry — nothing "in transit" unless this segment says so
     hideAllBubbles();
-    if(seg.key==='brainstorm'){ setFlavorMsg('brainstorm'); itemVisible=false; showPostPreview(false); showBubble('ideaA','ネタ出し中…'); showBubble('ideaB','いいね、それで行こう！'); }
-    if(seg.key==='gen'){ setMsg(0); STATIONS[IDX.creator].atb=0; itemVisible=false; showBubble('creator','執筆中…'); }
+    if(seg.key==='brainstorm'){ setFlavorMsg('brainstorm'); itemVisible=false; showPostPreview(false); showBubble('ideaA','（演出）ネタ出し中'); showBubble('ideaB','いいね、それで！'); }
+    if(seg.key==='gen'){ setMsg(0); STATIONS[IDX.creator].atb=0; itemVisible=false; showBubble('creator','AIが執筆中…'); }
     if(seg.key==='travelA'){ travel={from:IDX.creator,to:IDX.reviewA}; itemStage='text'; itemVisible=true; itemOwner=IDX.reviewA; }
-    if(seg.key==='evalDiscuss'){ setFlavorMsg('evalDiscuss'); itemOwner=IDX.reviewA; showBubble('reviewA','ここ直そうか'); showBubble('reviewB','いいと思う！'); }
+    if(seg.key==='evalDiscuss'){ setFlavorMsg('evalDiscuss'); itemOwner=IDX.reviewA; showBubble('reviewA','（演出）ここ直そうか'); showBubble('reviewB','いいと思う！'); }
     if(seg.key==='travelB'){ travel={from:IDX.reviewA,to:IDX.tmplbot}; itemStage='text'; itemOwner=IDX.tmplbot; }
-    if(seg.key==='tmplProc'){ setMsg(1); STATIONS[IDX.tmplbot].atb=0; itemStage='template'; itemOwner=IDX.tmplbot; showBubble('tmplbot','合成中…'); }
+    if(seg.key==='tmplProc'){ setMsg(1); STATIONS[IDX.tmplbot].atb=0; itemStage='template'; itemOwner=IDX.tmplbot; showBubble('tmplbot','（演出）合成中'); }
     if(seg.key==='travelC'){ travel={from:IDX.tmplbot,to:IDX.shotbot}; itemStage='template'; itemOwner=IDX.shotbot; }
-    if(seg.key==='shotProc'){ setMsg(2); STATIONS[IDX.shotbot].atb=0; itemStage='image'; itemOwner=IDX.shotbot; showBubble('shotbot','撮影中…'); }
+    if(seg.key==='shotProc'){ setMsg(2); STATIONS[IDX.shotbot].atb=0; itemStage='image'; itemOwner=IDX.shotbot; showBubble('shotbot','（演出）撮影中'); }
     if(seg.key==='travelD'){ travel={from:IDX.shotbot,to:IDX.upbot}; itemStage='image'; itemOwner=IDX.upbot; }
-    if(seg.key==='upProc'){ setMsg(3); STATIONS[IDX.upbot].atb=0; itemStage='imageurl'; itemOwner=IDX.upbot; showBubble('upbot','アップロード中…'); }
+    if(seg.key==='upProc'){ setMsg(3); STATIONS[IDX.upbot].atb=0; itemStage='imageurl'; itemOwner=IDX.upbot; showBubble('upbot','（演出）アップロード中'); }
     if(seg.key==='travelE'){ travel={from:IDX.upbot,to:IDX.poster}; itemStage='imageurl'; itemOwner=IDX.poster; }
-    if(seg.key==='ig'){ setMsg(4); STATIONS[IDX.poster].atb=0; itemVisible=false; showBubble('poster','Instagramに予約中…'); }
-    if(seg.key==='threads'){ setMsg(5); STATIONS[IDX.poster].atb=0; showBubble('poster','Threadsに予約中…'); }
-    if(seg.key==='log'){ setMsg(6); STATIONS[IDX.poster].atb=0; showBubble('poster','記録・通知中…'); }
-    if(seg.key==='donePause'){ posts+=1; document.getElementById('statPosts').textContent = posts; showPostPreview(true); showBubble('poster','できました！'); }
+    if(seg.key==='ig'){ setMsg(4); STATIONS[IDX.poster].atb=0; itemVisible=false; showBubble('poster','（演出）IG予約'); }
+    if(seg.key==='threads'){ setMsg(5); STATIONS[IDX.poster].atb=0; showBubble('poster','（演出）Threads予約'); }
+    if(seg.key==='log'){ setMsg(6); STATIONS[IDX.poster].atb=0; showBubble('poster','（演出）記録・通知'); }
+    if(seg.key==='donePause'){ posts+=1; document.getElementById('statPosts').textContent = posts; showPostPreview(true); showBubble('poster','（演出）完了！'); }
     if(seg.key==='resetPause'){ cycle+=1; document.getElementById('statCycle').textContent = cycle+' 周目'; }
   }
   enterSeg(0);
