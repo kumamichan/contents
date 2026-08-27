@@ -161,7 +161,7 @@
     </div>
   </div>
 
-  <div class="foot">PROTOTYPE — ローポリ3Dモデルはオリジナル制作物です（特定作品のモデルデータではありません） / build: 2026-08-27-v9（生成開始まで待機）</div>
+  <div class="foot">PROTOTYPE — ローポリ3Dモデルはオリジナル制作物です（特定作品のモデルデータではありません） / build: 2026-08-27-v10（どのモードでも用意した画像を使用）</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
@@ -822,17 +822,14 @@
       return;
     }
     genBtn.disabled = true; micBtn.disabled = true;
-    genStatus.textContent = imageMode==='ai'
-      ? '生成中…（文章と画像をAIが作っています。10秒ほどかかることがあります）'
-      : imageMode==='photo'
-        ? '生成中…（文章を生成し、用意した写真に合成しています）'
-        : '生成中…（文章を生成し、テンプレートに埋め込んでいます）';
+    genStatus.textContent = '生成中…（文章をAIが作っています）';
     genStatus.className='gen-status';
     holdOnDone = true;
     demoRunning = true; // ここで初めてアニメーション・セリフの進行を開始する
     enterSeg(0); // ここでアニメーションを即座に開始し、実際のAI生成と同時進行させる
     try{
-      const gasMode = (imageMode === 'ai') ? 'ai' : 'template'; // photo/templateはGAS側の画像生成を呼ばない（コスト・時間の節約）
+      // セミナー向け：どのモードを選んでも、常に用意した画像を使い、GAS側の画像生成（Gemini）は呼ばない
+      const gasMode = 'template';
       const res = await fetch(GAS_WEBAPP_URL, {
         method:'POST',
         cache:'no-store',
@@ -847,17 +844,10 @@
 
       const ppImg = document.getElementById('ppImageImg');
       const ppText = document.getElementById('ppImageText');
-      let finalImage, imageNote = '';
-      if(imageMode === 'ai' && data.image){
-        finalImage = await compositeTextOnImage(data.image, data.headline);
-      } else if(imageMode === 'photo' && preparedPhotoDataUrl){
-        finalImage = presetHasOwnText
-          ? preparedPhotoDataUrl // すでに文字が入っている画像はそのまま使う
-          : await compositeTextOnImage(preparedPhotoDataUrl, data.headline);
-      } else {
-        finalImage = renderTemplateImage(data.headline);
-        if(imageMode === 'photo' && !preparedPhotoDataUrl) imageNote = '写真が選ばれていなかったためテンプレート画像を使いました。';
-      }
+      // 常に用意した画像を使う（すでに文字が入っているのでそのまま／文字なしなら見出しを合成）
+      let finalImage = presetHasOwnText
+        ? preparedPhotoDataUrl
+        : await compositeTextOnImage(preparedPhotoDataUrl, data.headline);
       ppImg.src = finalImage;
       ppImg.style.display = 'block';
       ppText.style.display = 'none';
@@ -868,11 +858,7 @@
 
       showPostPreview(true); // 生成が終わった時点ですぐに表示する（アニメーション完了を待たない）
 
-      genStatus.textContent = (imageMode === 'ai' && data.imageError)
-        ? '文章は生成できましたが、AI画像生成でエラーが出たためテンプレート画像を使いました（' + data.imageError + '）。'
-        : imageNote
-          ? imageNote
-          : '生成できました。';
+      genStatus.textContent = '生成できました。';
     } catch(err){
       genStatus.textContent = 'エラー: ' + err.message;
       genStatus.className='gen-status error';
